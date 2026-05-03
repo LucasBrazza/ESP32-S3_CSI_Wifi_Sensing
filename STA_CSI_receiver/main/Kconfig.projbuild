@@ -1,0 +1,11 @@
+menu "Wi-Fi CSI Project Configuration"
+
+config WIFI_SSID
+    string "Wi-Fi SSID"
+    default "TCC_CSI_AP"
+
+config WIFI_PASSWORD
+    string "Wi-Fi password"
+    default "12345678"
+
+endmenu
