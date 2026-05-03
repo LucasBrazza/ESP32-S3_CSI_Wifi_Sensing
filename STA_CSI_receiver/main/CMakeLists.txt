@@ -1,2 +1,10 @@
-idf_component_register(SRCS "main.c" "main.c"
-                    INCLUDE_DIRS ".")
+idf_component_register(
+    SRCS
+        "main.c"
+        "aquisition/wifi_manager.c"
+        "aquisition/csi_manager.c"
+        "aquisition/udp_receiver.c"
+    INCLUDE_DIRS
+        "."
+        "aquisition"
+)
