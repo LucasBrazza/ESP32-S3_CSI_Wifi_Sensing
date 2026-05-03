@@ -23,28 +23,24 @@ static bool csi_enabled = false;
  */
 static void wifi_csi_rx_cb(void *ctx, wifi_csi_info_t *info)
 {
-    /*
-     * Safety check.
-     * info contains metadata and info->buf contains the raw CSI samples.
-     */
     if (!info || !info->buf) {
         return;
     }
 
-    /*
-     * Temporary output format.
-     *
-     * At this stage, only basic metadata is printed. Later, this will be
-     * expanded to include the raw CSI buffer so the data can be saved and
-     * analyzed.
-     */
     printf(
-        "CSI,len=%d,rssi=%d,rate=%d,channel=%d\n",
-        info->len,
+        "CSI,%lld,%d,%d,%d,%d",
+        esp_timer_get_time(),
         info->rx_ctrl.rssi,
         info->rx_ctrl.rate,
-        info->rx_ctrl.channel
+        info->rx_ctrl.channel,
+        info->len
     );
+
+    for (int i = 0; i < info->len; i++) {
+        printf(",%d", info->buf[i]);
+    }
+
+    printf("\n");
 }
 
 /*
