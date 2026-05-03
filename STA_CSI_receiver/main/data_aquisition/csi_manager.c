@@ -13,13 +13,32 @@ static bool csi_enabled = false;
 /*
  * CSI receive callback.
  *
- * This function is called by the Wi-Fi driver whenever a packet with CSI
- * information is received.
+ * This function is called by the Wi-Fi driver every time a packet
+ * containing Channel State Information (CSI) is received.
+ *
+ * The goal of this callback is to extract and output raw CSI data
+ * along with relevant metadata for later analysis and dataset creation.
+ *
+ * Output format (CSV-like):
+ *
+ * CSI,<timestamp_us>,<rssi>,<rate>,<channel>,<len>,<data...>
+ *
+ * Where:
+ * - timestamp_us : local timestamp in microseconds (ESP timer)
+ * - rssi         : received signal strength indicator (dBm)
+ * - rate         : PHY data rate used for the packet
+ * - channel      : Wi-Fi channel used
+ * - len          : number of CSI samples
+ * - data         : raw CSI buffer (signed 8-bit values)
  *
  * Important:
- * This callback runs inside the Wi-Fi task context. For this reason, it must
- * remain lightweight. Heavy processing, filtering, feature extraction, or
- * classification should be moved to another task using a queue or buffer.
+ * - This function runs inside the Wi-Fi task context.
+ * - It MUST remain lightweight to avoid impacting Wi-Fi performance.
+ * - Heavy processing (filtering, feature extraction, ML inference)
+ *   should NOT be done here. Use queues/tasks instead.
+ *
+ * For now, the data is printed via serial and captured on the PC
+ * to build a labeled dataset for the Wi-Fi sensing application.
  */
 static void wifi_csi_rx_cb(void *ctx, wifi_csi_info_t *info)
 {
