@@ -1,3 +1,5 @@
 AP_controller/.vscode/settings.json
 Tools/serial_logger/serial_logger_parsed.py
 Tools/serial_logger/datasets
+STA_CSI_receiver\.vscode
+AP_controller\.vscode
