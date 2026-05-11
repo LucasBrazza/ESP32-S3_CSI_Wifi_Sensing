@@ -5,6 +5,7 @@
 #include "esp_log.h"
 #include "esp_wifi.h"
 #include "esp_wifi_types.h"
+#include "esp_timer.h"
 
 static const char *TAG = "csi_manager";
 
