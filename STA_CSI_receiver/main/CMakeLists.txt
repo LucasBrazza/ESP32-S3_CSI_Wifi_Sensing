@@ -1,10 +1,10 @@
 idf_component_register(
     SRCS
         "main.c"
-        "aquisition/wifi_manager.c"
-        "aquisition/csi_manager.c"
-        "aquisition/udp_receiver.c"
+        "data_aquisition/wifi_manager.c"
+        "data_aquisition/csi_manager.c"
+        "data_aquisition/udp_receiver.c"
     INCLUDE_DIRS
         "."
-        "aquisition"
+        "data_aquisition"
 )
