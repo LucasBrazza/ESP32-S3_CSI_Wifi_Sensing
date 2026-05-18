@@ -7,3 +7,7 @@ STA_CSI_receiver/.vscode/settings.json
 Tools/csi_viewer/__pycache__/csi_parser.cpython-311.pyc
 Tools/serial_logger/serial_logger_parsed_debug.py
 STA_CSI_receiver/.vscode/settings.json
+Tools/datasets/features/empty_20260517_220206_features.csv
+Tools/datasets/raw/empty_20260517_220206_raw.csv
+Tools/preprocessing/__pycache__/__init__.cpython-311.pyc
+Tools/preprocessing/__pycache__/csi_preprocessor.cpython-311.pyc
