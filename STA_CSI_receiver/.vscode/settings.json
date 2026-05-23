@@ -1,5 +1,7 @@
 {
   "C_Cpp.intelliSenseEngine": "default",
+  "C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json",
+
   "idf.openOcdConfigs": [
     "board/esp32s3-builtin.cfg"
   ],
