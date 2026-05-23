@@ -1,6 +1,5 @@
 import sys
 import csv
-import math
 from pathlib import Path
 
 TOOLS_DIR = Path(__file__).resolve().parent.parent
@@ -8,15 +7,7 @@ TOOLS_DIR = Path(__file__).resolve().parent.parent
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
-from preprocessing.csi_binary_io import read_packets
-
-
-def compute_amplitude(real, imag):
-    return math.sqrt(real * real + imag * imag)
-
-
-def compute_phase(real, imag):
-    return math.atan2(imag, real)
+from Tools.csi.csi_binary_io import read_packets
 
 
 def convert_bin_to_csv(input_file: Path, output_file: Path):
@@ -31,8 +22,6 @@ def convert_bin_to_csv(input_file: Path, output_file: Path):
         "subcarrier",
         "imag",
         "real",
-        "amplitude",
-        "phase",
         "rssi",
         "rate",
         "channel",
@@ -50,25 +39,14 @@ def convert_bin_to_csv(input_file: Path, output_file: Path):
             n = min(len(imag), len(real))
 
             for subcarrier in range(n):
-                imag_value = imag[subcarrier]
-                real_value = real[subcarrier]
-
                 writer.writerow(
                     {
                         "label": packet["label"],
                         "pc_timestamp": packet["pc_timestamp"],
                         "packet_index": packet_index,
                         "subcarrier": subcarrier,
-                        "imag": imag_value,
-                        "real": real_value,
-                        "amplitude": compute_amplitude(
-                            real_value,
-                            imag_value,
-                        ),
-                        "phase": compute_phase(
-                            real_value,
-                            imag_value,
-                        ),
+                        "imag": imag[subcarrier],
+                        "real": real[subcarrier],
                         "rssi": packet["rssi"],
                         "rate": packet["rate"],
                         "channel": packet["channel"],

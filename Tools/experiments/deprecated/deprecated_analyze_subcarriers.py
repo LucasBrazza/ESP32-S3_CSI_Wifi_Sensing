@@ -9,7 +9,7 @@ TOOLS_DIR = Path(__file__).resolve().parent.parent
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
-from preprocessing.csi_binary_io import read_packets
+from Tools.csi.csi_binary_io import read_packets
 
 
 # ================= PATHS =================

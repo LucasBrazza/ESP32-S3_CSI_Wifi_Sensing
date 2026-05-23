@@ -8,7 +8,7 @@ import numpy as np
 import pyqtgraph as pg
 from PyQt5 import QtWidgets, QtCore
 
-from csi_parser import parse_csi_line
+from Tools.acquisition.gui.csi_parser import parse_csi_line
 
 
 DEFAULT_BAUD = 115200
