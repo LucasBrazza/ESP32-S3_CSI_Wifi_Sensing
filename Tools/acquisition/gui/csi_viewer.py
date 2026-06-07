@@ -11,18 +11,17 @@ import serial.tools.list_ports
 import pyqtgraph as pg
 from PyQt5 import QtWidgets, QtCore
 
-from Tools.acquisition.gui.csi_parser import parse_csi_line
-
 
 # ================= PATHS =================
 
-TOOLS_DIR = Path(__file__).resolve().parent.parent
+TOOLS_DIR = Path(__file__).resolve().parents[2]
 
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
-from Tools.csi.csi_binary_io import write_packets
 
+from acquisition.gui.csi_parser import parse_csi_line
+from csi.csi_binary_io import write_packets
 
 # ================= CONFIG =================
 

@@ -2,12 +2,12 @@ import sys
 import csv
 from pathlib import Path
 
-TOOLS_DIR = Path(__file__).resolve().parent.parent
+TOOLS_DIR = Path(__file__).resolve().parents[1]
 
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
-from Tools.csi.csi_binary_io import read_packets
+from csi.csi_binary_io import read_packets
 
 
 def convert_bin_to_csv(input_file: Path, output_file: Path):
