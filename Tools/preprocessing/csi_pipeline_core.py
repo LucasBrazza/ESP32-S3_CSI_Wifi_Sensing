@@ -1,12 +1,17 @@
 from pathlib import Path
 import sys
 
+
 # ================= PATHS =================
 
 TOOLS_DIR = Path(__file__).resolve().parents[1]
+CLASSIFICATION_DIR = TOOLS_DIR / "classification"
 
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
+
+if str(CLASSIFICATION_DIR) not in sys.path:
+    sys.path.insert(0, str(CLASSIFICATION_DIR))
 
 
 from core_math import (
@@ -27,18 +32,27 @@ from feature_selection import (
     rank_features_by_fisher_score,
     select_top_features,
 )
-from csi.csi_binary_io import read_packets
 from pipeline_parameters import save_pipeline_parameters
-from subcarrier_analysis import (
-    rank_subcarriers_by_occurrence,
-    select_subcarriers_from_ranking,
-    print_ranked_subcarriers,
-)
 from subcarrier_correlation import (
     select_non_redundant_subcarriers,
     filter_matrix_by_subcarriers,
     print_selected_subcarriers,
 )
+from subcarrier_analysis import (
+    rank_subcarriers_by_occurrence,
+    select_subcarriers_from_ranking,
+    print_ranked_subcarriers,
+)
+from decision_tree import (
+    build_tree,
+    print_tree,
+    leave_one_out_cross_validation,
+    accuracy,
+    confusion_matrix,
+    print_confusion_matrix,
+)
+
+from csi.csi_binary_io import read_packets
 
 
 # ================= CONFIG =================
@@ -46,8 +60,7 @@ from subcarrier_correlation import (
 WINDOW_SIZE = 20
 STEP_SIZE = 5
 TOP_K_FEATURES = 30
-
-CORRELATION_THRESHOLD = 0.80
+CORRELATION_THRESHOLD = 0.40
 
 FEATURES_PER_SUBCARRIER = 6
 
@@ -371,7 +384,12 @@ def inspect_bin_file(file_path):
 
 # ================= DATASET COM JANELAS =================
 
-def build_labeled_window_dataset(file_label_pairs, window_size=20, step_size=5, correlation_threshold=0.8):
+def build_labeled_window_dataset(
+    file_label_pairs,
+    window_size=20,
+    step_size=5,
+    correlation_threshold=0.80,
+):
     file_paths = []
 
     for file_path, label in file_label_pairs:
@@ -381,7 +399,6 @@ def build_labeled_window_dataset(file_label_pairs, window_size=20, step_size=5, 
 
     means = fit_result["means"]
     stds = fit_result["stds"]
-
     normalized_all = fit_result["normalized"]
 
     selected_subcarriers = select_non_redundant_subcarriers(
@@ -424,13 +441,13 @@ def build_labeled_window_dataset(file_label_pairs, window_size=20, step_size=5, 
         "step_size": step_size,
         "num_windows": len(dataset),
     }
-    
+
+
 # ================= ANÁLISE DE FEATURES =================
 
 def describe_feature_index(feature_index):
     subcarrier = feature_index // FEATURES_PER_SUBCARRIER
     feature_position = feature_index % FEATURES_PER_SUBCARRIER
-
     feature_name = FEATURE_NAMES[feature_position]
 
     return subcarrier, feature_name
@@ -514,7 +531,6 @@ if __name__ == "__main__":
     print("Correlation threshold:", CORRELATION_THRESHOLD)
     print("Médias:", len(result["means"]))
     print("Desvios:", len(result["stds"]))
-
     print(
         "Subportadoras após correlação:",
         len(result["selected_subcarriers"])
@@ -557,12 +573,10 @@ if __name__ == "__main__":
         feature_dataset
     )
 
-    selected_dataset, selected_indices = (
-        select_top_features(
-            feature_dataset,
-            ranking,
-            top_k=TOP_K_FEATURES,
-        )
+    selected_dataset, selected_indices = select_top_features(
+        feature_dataset,
+        ranking,
+        top_k=TOP_K_FEATURES,
     )
 
     print()
@@ -623,12 +637,10 @@ if __name__ == "__main__":
         top_n=TOP_K_FEATURES,
     )
 
-    selected_subcarriers_fisher = (
-        select_subcarriers_from_ranking(
-            ranking,
-            top_n=TOP_K_FEATURES,
-            min_count=1,
-        )
+    selected_subcarriers_fisher = select_subcarriers_from_ranking(
+        ranking,
+        top_n=TOP_K_FEATURES,
+        min_count=1,
     )
 
     print_ranked_subcarriers(
@@ -636,14 +648,45 @@ if __name__ == "__main__":
     )
 
     print()
-    print(
-        "Subportadoras selecionadas pelo Fisher:"
-    )
+    print("Subportadoras selecionadas pelo Fisher:")
     print(selected_subcarriers_fisher)
-    print(
-        "Total:",
-        len(selected_subcarriers_fisher)
+    print("Total:", len(selected_subcarriers_fisher))
+
+    # ================= CLASSIFICAÇÃO =================
+
+    print()
+    print("Treinando árvore de decisão...")
+
+    tree = build_tree(
+        selected_dataset,
+        max_depth=4,
+        min_samples_split=2,
     )
+
+    print()
+    print("Árvore treinada:")
+    print_tree(tree)
+
+    predictions = leave_one_out_cross_validation(
+        selected_dataset,
+        max_depth=4,
+        min_samples_split=2,
+    )
+
+    acc = accuracy(predictions)
+
+    print()
+    print("Validação Leave-One-Out concluída.")
+    print("Acurácia:", acc)
+
+    labels, matrix = confusion_matrix(predictions)
+
+    print_confusion_matrix(
+        labels,
+        matrix,
+    )
+
+    # ================= RESUMO FINAL =================
 
     print()
     print("Resumo final:")
@@ -658,4 +701,8 @@ if __name__ == "__main__":
     print(
         "Features finais:",
         len(selected_indices)
+    )
+    print(
+        "Acurácia LOOCV:",
+        acc,
     )
