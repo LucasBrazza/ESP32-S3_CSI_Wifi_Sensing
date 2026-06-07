@@ -19,9 +19,9 @@ TOOLS_DIR = Path(__file__).resolve().parents[2]
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
-
 from acquisition.gui.csi_parser import parse_csi_line
 from csi.csi_binary_io import write_packets
+
 
 # ================= CONFIG =================
 
@@ -36,14 +36,8 @@ SUBCARRIERS_TO_PLOT = [0, 5, 10, 15, 20, 25]
 
 DATASET_DIR = TOOLS_DIR / "datasets"
 
-RAW_BIN_DIR = DATASET_DIR / "bin" / "raw"
-DEBUG_CSV_DIR = DATASET_DIR / "csv" / "debug_csv"
-
-# feature_bin ainda NÃO será usado.
-# Primeiro precisamos estabilizar:
-# - subportadoras úteis00
-# - preprocessamento
-# - features finais
+RAW_BIN_DIR = DATASET_DIR / "raw_bin"
+DEBUG_CSV_DIR = DATASET_DIR / "debug_csv"
 
 
 # ================= SERIAL READER =================
@@ -59,12 +53,10 @@ class SerialReader:
 
     def start(self):
         self.running = True
-
         self.thread = threading.Thread(
             target=self._read_loop,
             daemon=True,
         )
-
         self.thread.start()
 
     def stop(self):
@@ -141,16 +133,13 @@ class CSIViewer(QtWidgets.QMainWindow):
         self._build_ui()
 
         self.timer = QtCore.QTimer()
-        self.timer.timeout.connect(
-            self.process_lines_and_update_plots
-        )
+        self.timer.timeout.connect(self.process_lines_and_update_plots)
         self.timer.start(PLOT_UPDATE_MS)
 
     # ================= UI =================
 
     def _build_ui(self):
         central = QtWidgets.QWidget()
-
         main_layout = QtWidgets.QVBoxLayout(central)
 
         controls = QtWidgets.QHBoxLayout()
@@ -161,48 +150,32 @@ class CSIViewer(QtWidgets.QMainWindow):
         refresh_button = QtWidgets.QPushButton("Refresh")
         refresh_button.clicked.connect(self.refresh_ports)
 
-        self.baud_input = QtWidgets.QLineEdit(
-            str(DEFAULT_BAUD)
-        )
+        self.baud_input = QtWidgets.QLineEdit(str(DEFAULT_BAUD))
         self.baud_input.setFixedWidth(100)
 
-        self.start_serial_button = QtWidgets.QPushButton(
-            "Start Serial"
-        )
-        self.start_serial_button.clicked.connect(
-            self.toggle_serial
-        )
+        self.start_serial_button = QtWidgets.QPushButton("Start Serial")
+        self.start_serial_button.clicked.connect(self.toggle_serial)
 
-        self.status_label = QtWidgets.QLabel(
-            "Disconnected"
-        )
+        self.status_label = QtWidgets.QLabel("Disconnected")
 
-        self.stats_label = QtWidgets.QLabel(
-            "Lines: 0 | Packets: 0 | Queue: 0"
-        )
+        self.stats_label = QtWidgets.QLabel("Lines: 0 | Packets: 0 | Queue: 0")
 
         controls.addWidget(QtWidgets.QLabel("Port"))
         controls.addWidget(self.port_combo)
         controls.addWidget(refresh_button)
-
         controls.addWidget(QtWidgets.QLabel("Baud"))
         controls.addWidget(self.baud_input)
-
         controls.addWidget(self.start_serial_button)
         controls.addWidget(self.status_label)
-
         controls.addStretch()
-
         controls.addWidget(self.stats_label)
 
         main_layout.addLayout(controls)
 
         grid = QtWidgets.QGridLayout()
-
         main_layout.addLayout(grid)
 
         self.collection_panel = self._create_collection_panel()
-
         grid.addWidget(self.collection_panel, 0, 0, 2, 1)
 
         # ================= WAVEFORM =================
@@ -212,16 +185,8 @@ class CSIViewer(QtWidgets.QMainWindow):
         )
 
         self.waveform_widget.addLegend()
-
-        self.waveform_widget.setLabel(
-            "left",
-            "Amplitude",
-        )
-
-        self.waveform_widget.setLabel(
-            "bottom",
-            "Packets",
-        )
+        self.waveform_widget.setLabel("left", "Amplitude")
+        self.waveform_widget.setLabel("bottom", "Packets")
 
         self.waveform_curves = {}
 
@@ -234,9 +199,7 @@ class CSIViewer(QtWidgets.QMainWindow):
             (0, 255, 255),
         ]
 
-        for i, subcarrier in enumerate(
-            SUBCARRIERS_TO_PLOT
-        ):
+        for i, subcarrier in enumerate(SUBCARRIERS_TO_PLOT):
             curve = self.waveform_widget.plot(
                 pen=pg.mkPen(
                     color=colors[i % len(colors)],
@@ -251,9 +214,7 @@ class CSIViewer(QtWidgets.QMainWindow):
 
         # ================= RSSI =================
 
-        self.rssi_widget = pg.PlotWidget(
-            title="RSSI Over Time"
-        )
+        self.rssi_widget = pg.PlotWidget(title="RSSI Over Time")
 
         self.rssi_curve = self.rssi_widget.plot(
             pen=pg.mkPen(
@@ -262,25 +223,15 @@ class CSIViewer(QtWidgets.QMainWindow):
             )
         )
 
-        self.rssi_widget.setLabel(
-            "left",
-            "RSSI dBm",
-        )
-
-        self.rssi_widget.setLabel(
-            "bottom",
-            "Packets",
-        )
+        self.rssi_widget.setLabel("left", "RSSI dBm")
+        self.rssi_widget.setLabel("bottom", "Packets")
 
         grid.addWidget(self.rssi_widget, 1, 1)
 
         self.setCentralWidget(central)
 
     def _create_collection_panel(self):
-        group = QtWidgets.QGroupBox(
-            "Dataset Collection"
-        )
-
+        group = QtWidgets.QGroupBox("Dataset Collection")
         layout = QtWidgets.QVBoxLayout(group)
 
         self.label_combo = QtWidgets.QComboBox()
@@ -294,117 +245,59 @@ class CSIViewer(QtWidgets.QMainWindow):
         )
 
         self.offset_input = QtWidgets.QDoubleSpinBox()
-
         self.offset_input.setRange(0, 300)
         self.offset_input.setValue(0)
         self.offset_input.setSuffix(" s")
 
         self.duration_input = QtWidgets.QDoubleSpinBox()
-
         self.duration_input.setRange(1, 3600)
         self.duration_input.setValue(60)
         self.duration_input.setSuffix(" s")
 
-        self.output_dir_input = QtWidgets.QLineEdit(
-            str(DATASET_DIR)
-        )
+        self.output_dir_input = QtWidgets.QLineEdit(str(DATASET_DIR))
 
-        browse_button = QtWidgets.QPushButton(
-            "Browse"
-        )
-
-        browse_button.clicked.connect(
-            self.select_output_dir
-        )
+        browse_button = QtWidgets.QPushButton("Browse")
+        browse_button.clicked.connect(self.select_output_dir)
 
         output_layout = QtWidgets.QHBoxLayout()
+        output_layout.addWidget(self.output_dir_input)
+        output_layout.addWidget(browse_button)
 
-        output_layout.addWidget(
-            self.output_dir_input
-        )
+        self.start_collection_button = QtWidgets.QPushButton("Start Collection")
+        self.start_collection_button.clicked.connect(self.start_collection)
 
-        output_layout.addWidget(
-            browse_button
-        )
-
-        self.start_collection_button = QtWidgets.QPushButton(
-            "Start Collection"
-        )
-
-        self.start_collection_button.clicked.connect(
-            self.start_collection
-        )
-
-        self.stop_collection_button = QtWidgets.QPushButton(
-            "Stop and Save"
-        )
-
-        self.stop_collection_button.clicked.connect(
-            self.stop_collection
-        )
-
+        self.stop_collection_button = QtWidgets.QPushButton("Stop and Save")
+        self.stop_collection_button.clicked.connect(self.stop_collection)
         self.stop_collection_button.setEnabled(False)
 
-        self.collection_status_label = QtWidgets.QLabel(
-            "Collection idle"
-        )
+        self.collection_status_label = QtWidgets.QLabel("Collection idle")
 
         self.collection_progress = QtWidgets.QProgressBar()
         self.collection_progress.setValue(0)
 
         form = QtWidgets.QFormLayout()
-
-        form.addRow(
-            "Label",
-            self.label_combo,
-        )
-
-        form.addRow(
-            "Start offset",
-            self.offset_input,
-        )
-
-        form.addRow(
-            "Duration",
-            self.duration_input,
-        )
-
-        form.addRow(
-            "Output folder",
-            output_layout,
-        )
+        form.addRow("Label", self.label_combo)
+        form.addRow("Start offset", self.offset_input)
+        form.addRow("Duration", self.duration_input)
+        form.addRow("Output folder", output_layout)
 
         layout.addLayout(form)
-
-        layout.addWidget(
-            self.start_collection_button
-        )
-
-        layout.addWidget(
-            self.stop_collection_button
-        )
-
-        layout.addWidget(
-            self.collection_progress
-        )
-
-        layout.addWidget(
-            self.collection_status_label
-        )
-
+        layout.addWidget(self.start_collection_button)
+        layout.addWidget(self.stop_collection_button)
+        layout.addWidget(self.collection_progress)
+        layout.addWidget(self.collection_status_label)
         layout.addStretch()
 
         info = QtWidgets.QLabel(
             "Saved files:\n"
             "datasets/raw_bin/label_timestamp.bin\n\n"
             "Debug CSV conversion:\n"
-            "preprocessing/bin_to_csv.py\n\n"
+            "csi/bin_to_csv.py\n\n"
             "Labels:\n"
             "empty | static_presence | movement"
         )
 
         info.setWordWrap(True)
-
         layout.addWidget(info)
 
         return group
@@ -427,18 +320,14 @@ class CSIViewer(QtWidgets.QMainWindow):
         port = self.port_combo.currentText()
 
         if not port:
-            self.status_label.setText(
-                "No COM selected"
-            )
+            self.status_label.setText("No COM selected")
             return
 
         try:
             baud = int(self.baud_input.text())
 
         except ValueError:
-            self.status_label.setText(
-                "Invalid baud rate"
-            )
+            self.status_label.setText("Invalid baud rate")
             return
 
         self.clear_runtime_data()
@@ -453,13 +342,8 @@ class CSIViewer(QtWidgets.QMainWindow):
 
         self.running = True
 
-        self.start_serial_button.setText(
-            "Stop Serial"
-        )
-
-        self.status_label.setText(
-            f"Connected: {port}"
-        )
+        self.start_serial_button.setText("Stop Serial")
+        self.status_label.setText(f"Connected: {port}")
 
     def stop_serial(self):
         if self.reader:
@@ -468,13 +352,8 @@ class CSIViewer(QtWidgets.QMainWindow):
 
         self.running = False
 
-        self.start_serial_button.setText(
-            "Start Serial"
-        )
-
-        self.status_label.setText(
-            "Disconnected"
-        )
+        self.start_serial_button.setText("Start Serial")
+        self.status_label.setText("Disconnected")
 
     # ================= COLLECTION =================
 
@@ -498,21 +377,13 @@ class CSIViewer(QtWidgets.QMainWindow):
         self.collection_packets = []
         self.collection_packet_index = 0
 
-        offset = float(
-            self.offset_input.value()
-        )
-
-        duration = float(
-            self.duration_input.value()
-        )
+        offset = float(self.offset_input.value())
+        duration = float(self.duration_input.value())
 
         now = time.time()
 
         self.collection_start_time = now + offset
-
-        self.collection_end_time = (
-            self.collection_start_time + duration
-        )
+        self.collection_end_time = self.collection_start_time + duration
 
         self.waiting_offset = offset > 0
         self.collecting = offset == 0
@@ -520,7 +391,6 @@ class CSIViewer(QtWidgets.QMainWindow):
         self.collection_progress.setValue(0)
 
         self.start_collection_button.setEnabled(False)
-
         self.stop_collection_button.setEnabled(True)
 
         if self.waiting_offset:
@@ -542,23 +412,16 @@ class CSIViewer(QtWidgets.QMainWindow):
         self.save_collection()
 
         self.start_collection_button.setEnabled(True)
-
         self.stop_collection_button.setEnabled(False)
 
     def save_collection(self):
         if not self.collection_packets:
-            self.collection_status_label.setText(
-                "No data collected."
-            )
+            self.collection_status_label.setText("No data collected.")
             return
 
-        base_output_dir = Path(
-            self.output_dir_input.text()
-        )
+        base_output_dir = Path(self.output_dir_input.text())
 
-        raw_bin_dir = (
-            base_output_dir / "raw_bin"
-        )
+        raw_bin_dir = base_output_dir / "raw_bin"
 
         raw_bin_dir.mkdir(
             parents=True,
@@ -567,23 +430,16 @@ class CSIViewer(QtWidgets.QMainWindow):
 
         label = self.label_combo.currentText()
 
-        timestamp = datetime.now().strftime(
-            "%Y%m%d_%H%M%S"
-        )
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        bin_file_path = (
-            raw_bin_dir
-            / f"{label}_{timestamp}.bin"
-        )
+        bin_file_path = raw_bin_dir / f"{label}_{timestamp}.bin"
 
         write_packets(
             bin_file_path,
             self.collection_packets,
         )
 
-        print(
-            f"BIN saved at: {bin_file_path}"
-        )
+        print(f"BIN saved at: {bin_file_path}")
 
         self.collection_status_label.setText(
             f"Saved:\n{bin_file_path.name}"
@@ -638,33 +494,31 @@ class CSIViewer(QtWidgets.QMainWindow):
             if parsed is None:
                 continue
 
-            amplitude = parsed.get("amplitude")
+            imag = parsed.get("imag")
+            real = parsed.get("real")
 
-            if amplitude is None or len(amplitude) == 0:
+            if imag is None or real is None:
                 continue
 
-            metadata = parsed.get(
-                "metadata",
-                {},
-            )
+            if len(imag) == 0 or len(real) == 0:
+                continue
 
+            amplitude = [
+                (float(i) ** 2 + float(r) ** 2) ** 0.5
+                for i, r in zip(imag, real)
+            ]
+
+            metadata = parsed.get("metadata", {})
             rssi = metadata.get("rssi", 0)
 
-            self.amplitude_history.append(
-                amplitude
-            )
-
-            self.rssi_history.append(
-                rssi
-            )
+            self.amplitude_history.append(amplitude)
+            self.rssi_history.append(rssi)
 
             self.total_packets += 1
             new_packets += 1
 
             if self.collecting:
-                self.append_collection_packet(
-                    parsed
-                )
+                self.append_collection_packet(parsed)
 
         if new_packets > 0:
             self.update_plots()
@@ -673,9 +527,7 @@ class CSIViewer(QtWidgets.QMainWindow):
 
     def update_collection_timing(self, now):
         if self.waiting_offset:
-            remaining = (
-                self.collection_start_time - now
-            )
+            remaining = self.collection_start_time - now
 
             if remaining <= 0:
                 self.waiting_offset = False
@@ -691,15 +543,8 @@ class CSIViewer(QtWidgets.QMainWindow):
                 )
 
         if self.collecting:
-            duration = (
-                self.collection_end_time
-                - self.collection_start_time
-            )
-
-            elapsed = (
-                now
-                - self.collection_start_time
-            )
+            duration = self.collection_end_time - self.collection_start_time
+            elapsed = now - self.collection_start_time
 
             progress = int(
                 max(
@@ -711,32 +556,21 @@ class CSIViewer(QtWidgets.QMainWindow):
                 )
             )
 
-            self.collection_progress.setValue(
-                progress
-            )
+            self.collection_progress.setValue(progress)
 
             if now >= self.collection_end_time:
                 self.collecting = False
 
                 self.save_collection()
 
-                self.start_collection_button.setEnabled(
-                    True
-                )
-
-                self.stop_collection_button.setEnabled(
-                    False
-                )
+                self.start_collection_button.setEnabled(True)
+                self.stop_collection_button.setEnabled(False)
 
     def append_collection_packet(self, parsed):
         label = self.label_combo.currentText()
-
         pc_timestamp = time.time()
 
-        metadata = parsed.get(
-            "metadata",
-            {},
-        )
+        metadata = parsed.get("metadata", {})
 
         imag = parsed.get("imag")
         real = parsed.get("real")
@@ -749,31 +583,16 @@ class CSIViewer(QtWidgets.QMainWindow):
         packet = {
             "label": label,
             "pc_timestamp": pc_timestamp,
-            "rssi": int(
-                metadata.get("rssi", 0) or 0
-            ),
-            "rate": int(
-                metadata.get("rate", 0) or 0
-            ),
-            "channel": int(
-                metadata.get("channel", 0) or 0
-            ),
-            "csi_len": int(
-                metadata.get("csi_len", 0) or 0
-            ),
-            "imag": [
-                int(value)
-                for value in imag
-            ],
-            "real": [
-                int(value)
-                for value in real
-            ],
+            "packet_index": self.collection_packet_index,
+            "rssi": int(metadata.get("rssi", 0) or 0),
+            "rate": int(metadata.get("rate", 0) or 0),
+            "channel": int(metadata.get("channel", 0) or 0),
+            "csi_len": int(metadata.get("csi_len", 0) or 0),
+            "imag": [int(value) for value in imag],
+            "real": [int(value) for value in real],
         }
 
-        self.collection_packets.append(
-            packet
-        )
+        self.collection_packets.append(packet)
 
     # ================= PLOTS =================
 
@@ -781,26 +600,16 @@ class CSIViewer(QtWidgets.QMainWindow):
         if not self.amplitude_history:
             return
 
-        for (
-            subcarrier,
-            curve,
-        ) in self.waveform_curves.items():
-
+        for subcarrier, curve in self.waveform_curves.items():
             values = []
 
             for amplitude in self.amplitude_history:
                 if subcarrier < len(amplitude):
-                    values.append(
-                        float(
-                            amplitude[subcarrier]
-                        )
-                    )
+                    values.append(float(amplitude[subcarrier]))
 
             curve.setData(values)
 
-        self.rssi_curve.setData(
-            list(self.rssi_history)
-        )
+        self.rssi_curve.setData(list(self.rssi_history))
 
     def update_stats_label(self):
         self.stats_label.setText(
@@ -827,12 +636,9 @@ def main():
         exist_ok=True,
     )
 
-    app = QtWidgets.QApplication(
-        sys.argv
-    )
+    app = QtWidgets.QApplication(sys.argv)
 
     viewer = CSIViewer()
-
     viewer.show()
 
     sys.exit(app.exec_())
