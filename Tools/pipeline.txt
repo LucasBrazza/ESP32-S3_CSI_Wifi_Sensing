@@ -1,0 +1,50 @@
+FASE 1 — TREINAMENTO/CALIBRAÇÃO NO PC
+
+raw_bin
+↓
+amplitude
+↓
+limpeza
+↓
+Hampel
+↓
+média móvel
+↓
+z-score calculando média/desvio
+↓
+remoção de redundância
+↓
+janelas
+↓
+features
+↓
+Fisher Score
+↓
+árvore de classificação
+↓
+salva parâmetros
+
+
+FASE 2 — TEMPO REAL
+
+novo pacote CSI
+↓
+amplitude
+↓
+limpeza simples
+↓
+Hampel em buffer curto
+↓
+média móvel em buffer curto
+↓
+z-score usando média/desvio salvos
+↓
+mantém só subportadoras escolhidas
+↓
+janela deslizante
+↓
+features
+↓
+árvore de classificação
+↓
+classe detectada
