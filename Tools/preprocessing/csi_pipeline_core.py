@@ -601,14 +601,6 @@ if __name__ == "__main__":
 
     # ================= SAVE PARAMETERS =================
 
-    save_pipeline_parameters(
-        "preprocessing/pipeline_parameters.json",
-        means=result["means"],
-        stds=result["stds"],
-        selected_indices=selected_indices,
-        window_size=WINDOW_SIZE,
-        step_size=STEP_SIZE,
-    )
 
     print()
     print("Parâmetros do pipeline salvos em:")
@@ -663,6 +655,20 @@ if __name__ == "__main__":
         min_samples_split=2,
     )
 
+    save_pipeline_parameters(
+        "preprocessing/pipeline_parameters.json",
+        means=result["means"],
+        stds=result["stds"],
+        selected_subcarriers=result["selected_subcarriers"],
+        selected_indices=selected_indices,
+        window_size=WINDOW_SIZE,
+        step_size=STEP_SIZE,
+        correlation_threshold=CORRELATION_THRESHOLD,
+        top_k_features=TOP_K_FEATURES,
+        decision_tree=tree,
+    )
+    
+    
     print()
     print("Árvore treinada:")
     print_tree(tree)
