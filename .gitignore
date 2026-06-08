@@ -1,16 +1,78 @@
-AP_controller/.vscode/settings.json
+# ==================================================
+# PYTHON
+# ==================================================
+
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ==================================================
+# VIRTUAL ENVS
+# ==================================================
+
+venv/
+.venv/
+env/
+ENV/
+
+# ==================================================
+# VS CODE / IDEs
+# ==================================================
+
+.vscode/
+.idea/
+
+# ==================================================
+# OPERATING SYSTEM
+# ==================================================
+
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ==================================================
+# DATASETS GERADOS
+# ==================================================
+
+Tools/datasets/
+Tools/serial_logger/datasets/
+
+# ==================================================
+# ARQUIVOS GERADOS PELO PIPELINE
+# ==================================================
+
+Tools/preprocessing/pipeline_parameters.json
+
+# ==================================================
+# LOGS
+# ==================================================
+
+*.log
+
+# ==================================================
+# BUILD ESP-IDF
+# ==================================================
+
+AP_controller/build/
+STA_CSI_receiver/build/
+
+# ==================================================
+# ESP-IDF CACHE
+# ==================================================
+
+AP_controller/sdkconfig.old
+STA_CSI_receiver/sdkconfig.old
+
+# ==================================================
+# CONFIGURAÇÕES LOCAIS
+# ==================================================
+
+AP_controller/.vscode/
+STA_CSI_receiver/.vscode/
+
+# ==================================================
+# SERIAL LOGGER
+# ==================================================
+
 Tools/serial_logger/serial_logger_parsed.py
-Tools/serial_logger/datasets
-STA_CSI_receiver/.vscode
-AP_controller/.vscode
-STA_CSI_receiver/.vscode/settings.json
-Tools/csi_viewer/__pycache__/csi_parser.cpython-311.pyc
 Tools/serial_logger/serial_logger_parsed_debug.py
-STA_CSI_receiver/.vscode/settings.json
-Tools/datasets/features/empty_20260517_220206_features.csv
-Tools/datasets/raw/empty_20260517_220206_raw.csv
-Tools/preprocessing/__pycache__/__init__.cpython-311.pyc
-Tools/preprocessing/__pycache__/csi_preprocessor.cpython-311.pyc
-Tools/acquisition/gui/__pycache__/csi_parser.cpython-311.pyc
-Tools/csi/__pycache__/__init__.cpython-311.pyc
-Tools/csi/__pycache__/csi_binary_io.cpython-311.pyc
