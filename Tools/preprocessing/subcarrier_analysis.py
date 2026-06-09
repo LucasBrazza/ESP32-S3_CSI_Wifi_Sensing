@@ -110,27 +110,3 @@ def print_ranked_subcarriers(ranked_subcarriers):
         )
 
 
-if __name__ == "__main__":
-    fake_ranking = [
-        {"feature_index": 206, "score": 35.25},
-        {"feature_index": 414, "score": 20.92},
-        {"feature_index": 294, "score": 19.84},
-        {"feature_index": 297, "score": 19.18},
-        {"feature_index": 963, "score": 15.44},
-    ]
-
-    ranked = rank_subcarriers_by_occurrence(
-        fake_ranking,
-        top_n=5,
-    )
-
-    print_ranked_subcarriers(ranked)
-
-    selected = select_subcarriers_from_ranking(
-        fake_ranking,
-        top_n=5,
-        min_count=1,
-    )
-
-    print()
-    print("Subportadoras selecionadas:", selected)

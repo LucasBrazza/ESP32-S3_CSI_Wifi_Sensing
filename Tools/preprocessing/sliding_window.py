@@ -92,27 +92,3 @@ def count_windows(total_packets, window_size=20, step_size=5):
     return count
 
 
-if __name__ == "__main__":
-    test_matrix = []
-
-    for packet_index in range(55):
-        row = []
-
-        for subcarrier in range(192):
-            row.append(packet_index + subcarrier)
-
-        test_matrix.append(row)
-
-    windows = create_sliding_windows(
-        test_matrix,
-        window_size=20,
-        step_size=5,
-    )
-
-    print("Pacotes:", len(test_matrix))
-    print("Subportadoras:", len(test_matrix[0]))
-    print("Janelas:", len(windows))
-
-    if windows:
-        print("Pacotes por janela:", len(windows[0]))
-        print("Subportadoras por pacote:", len(windows[0][0]))

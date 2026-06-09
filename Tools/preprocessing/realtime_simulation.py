@@ -215,26 +215,3 @@ def summarize_predictions(predictions):
         print("Classe predominante:", majority)
 
 
-# ================= MAIN =================
-
-if __name__ == "__main__":
-    parameters = load_pipeline_parameters(
-        PARAMETERS_FILE
-    )
-
-    print("Parâmetros carregados:")
-    print("Window size:", parameters["window_size"])
-    print("Step size:", parameters["step_size"])
-    print("Subportadoras:", len(parameters["selected_subcarriers"]))
-    print("Features:", len(parameters["selected_indices"]))
-
-    print()
-    print("Arquivo testado:")
-    print(TEST_BIN_FILE)
-
-    predictions = simulate_realtime_from_bin(
-        TEST_BIN_FILE,
-        parameters,
-    )
-
-    summarize_predictions(predictions)

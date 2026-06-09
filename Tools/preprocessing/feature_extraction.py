@@ -109,21 +109,3 @@ def extract_feature_dataset(labeled_windows):
 
     return dataset
 
-
-if __name__ == "__main__":
-    test_window = []
-
-    for packet_index in range(20):
-        row = []
-
-        for subcarrier in range(192):
-            row.append(packet_index + subcarrier)
-
-        test_window.append(row)
-
-    features = extract_features_from_window(test_window)
-
-    print("Pacotes na janela:", len(test_window))
-    print("Subportadoras:", len(test_window[0]))
-    print("Features geradas:", len(features))
-    print("Features por subportadora:", 6)

@@ -110,29 +110,3 @@ def select_top_features(feature_dataset, ranking, top_k=30):
         )
 
     return selected_dataset, selected_indices
-
-
-if __name__ == "__main__":
-    fake_dataset = [
-        {"label": "empty", "features": [1.0, 5.0, 0.1]},
-        {"label": "empty", "features": [1.1, 5.1, 0.2]},
-        {"label": "movement", "features": [5.0, 5.0, 0.3]},
-        {"label": "movement", "features": [5.2, 5.1, 0.4]},
-    ]
-
-    ranking = rank_features_by_fisher_score(fake_dataset)
-
-    print("Ranking:")
-
-    for item in ranking:
-        print(item)
-
-    selected, indices = select_top_features(
-        fake_dataset,
-        ranking,
-        top_k=2,
-    )
-
-    print()
-    print("Índices selecionados:", indices)
-    print("Features selecionadas:", selected)

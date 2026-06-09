@@ -113,37 +113,3 @@ def print_selected_subcarriers(selected_subcarriers):
     print("Subportadoras após remoção de redundância:")
     print(selected_subcarriers)
     print("Total:", len(selected_subcarriers))
-
-
-if __name__ == "__main__":
-    test_matrix = []
-
-    for packet_index in range(30):
-        row = []
-
-        for sc in range(10):
-            if sc == 1:
-                value = packet_index  # redundante com SC 0
-            elif sc == 0:
-                value = packet_index
-            else:
-                value = packet_index + (sc * 10)
-
-            row.append(value)
-
-        test_matrix.append(row)
-
-    selected = select_non_redundant_subcarriers(
-        test_matrix,
-        threshold=0.95,
-    )
-
-    print_selected_subcarriers(selected)
-
-    filtered = filter_matrix_by_subcarriers(
-        test_matrix,
-        selected,
-    )
-
-    print("Subportadoras antes:", len(test_matrix[0]))
-    print("Subportadoras depois:", len(filtered[0]))
