@@ -1,3 +1,58 @@
+"""
+CSI Training Pipeline
+
+This module implements the complete offline training and calibration
+pipeline used by the project.
+
+Its purpose is to transform raw CSI packets collected from the ESP32
+into a trained classification model and a set of calibration parameters
+that can later be reused during real-time inference.
+
+Pipeline overview:
+
+    raw_bin
+    ↓
+    amplitude extraction
+    ↓
+    packet validation and cleaning
+    ↓
+    Hampel filtering
+    ↓
+    moving average smoothing
+    ↓
+    Z-score normalization
+    ↓
+    subcarrier redundancy removal
+    ↓
+    sliding windows
+    ↓
+    feature extraction
+    ↓
+    Fisher Score ranking
+    ↓
+    feature selection
+    ↓
+    decision tree training
+    ↓
+    pipeline_parameters.json
+
+Training phase outputs:
+
+    - Mean and standard deviation of each subcarrier
+    - Selected non-redundant subcarriers
+    - Selected feature indices
+    - Decision tree model
+    - Pipeline configuration parameters
+
+These outputs are saved and later reused by the real-time pipeline,
+ensuring that the same preprocessing and classification steps are
+applied during deployment.
+
+The implementation intentionally avoids NumPy and other heavy scientific
+libraries whenever possible, keeping the code easier to port to
+MicroPython or embedded environments in future stages of the project.
+"""
+
 from pathlib import Path
 import sys
 
@@ -76,6 +131,20 @@ FEATURE_NAMES = [
 
 # ================= LOAD =================
 
+"""
+Data loading utilities.
+
+These functions are responsible for reading CSI binary files and
+converting the raw complex CSI values into amplitude matrices.
+
+Output format used throughout the pipeline:
+
+    matrix[packet][subcarrier]
+
+Each row represents a CSI packet and each column represents a
+subcarrier amplitude over time.
+"""
+
 def load_bin_file(file_path):
     file_path = Path(file_path)
     packets = read_packets(file_path)
@@ -110,6 +179,23 @@ def packets_to_amplitude_matrix(packets):
 
 
 # ================= LIMPEZA =================
+
+"""
+Signal validation and cleaning.
+
+The purpose of this stage is to remove corrupted or incomplete packets
+before any filtering or normalization is applied.
+
+Packets are discarded when:
+
+    - They contain NaN values
+    - They contain infinite values
+    - They contain only zeros
+    - Their subcarrier count differs from the expected size
+
+This guarantees a consistent matrix structure for the remaining stages
+of the pipeline.
+"""
 
 def is_valid_amplitude_row(row):
     if not row:
@@ -158,6 +244,33 @@ def remove_invalid_packets(matrix):
 
 
 # ================= HAMPEL =================
+
+"""
+Outlier removal using the Hampel filter.
+
+The Hampel filter replaces isolated abnormal samples using the local
+median of a sliding neighborhood.
+
+For each sample:
+
+    deviation = |x - median|
+
+A sample is replaced when:
+
+    |x - median| > n_sigmas × MAD
+
+where:
+
+    MAD = median absolute deviation
+
+and
+
+    scaled_MAD = 1.4826 × MAD
+
+This filter is particularly useful for CSI data because it removes
+isolated spikes without significantly affecting the overall signal
+shape.
+"""
 
 def hampel_filter_1d(signal, window_size=5, n_sigmas=3.0):
     filtered = signal[:]
@@ -212,6 +325,24 @@ def hampel_filter_matrix(matrix, window_size=5, n_sigmas=3.0):
 
 # ================= MÉDIA MÓVEL =================
 
+"""
+Signal smoothing using a moving average.
+
+Each sample is replaced by the average value of its local neighborhood.
+
+Formula:
+
+                Σ x(i)
+    mean = ---------------
+            number_of_samples
+
+This stage reduces high-frequency fluctuations while preserving the
+general behavior of the CSI signal.
+
+The moving average is applied after the Hampel filter because most
+outliers have already been removed.
+"""
+
 def moving_average_1d(signal, window_size=3):
     if window_size <= 1:
         return signal[:]
@@ -253,6 +384,26 @@ def moving_average_matrix(matrix, window_size=3):
 
 # ================= Z-SCORE =================
 
+"""
+Subcarrier normalization using Z-score.
+
+Each subcarrier is normalized independently.
+
+Formula:
+
+        x - μ
+    z = -------
+           σ
+
+where:
+
+    μ = mean
+    σ = standard deviation
+
+This transformation places all subcarriers on a comparable scale,
+reducing the influence of absolute amplitude differences.
+"""
+
 def fit_zscore_parameters(matrix):
     if not matrix:
         return [], []
@@ -289,6 +440,21 @@ def apply_zscore_parameters(matrix, means, stds):
 
 
 # ================= PIPELINE DE CALIBRAÇÃO =================
+
+"""
+Training-time calibration.
+
+All calibration files are combined into a single dataset in order to
+estimate global normalization parameters.
+
+Outputs:
+
+    means[subcarrier]
+    stds[subcarrier]
+
+These values are later reused during real-time inference so that the
+same normalization reference is applied to unseen data.
+"""
 
 def fit_preprocessing_pipeline(file_paths):
     all_rows = []
@@ -331,6 +497,16 @@ def fit_preprocessing_pipeline(file_paths):
 
 # ================= PIPELINE DE TRANSFORMAÇÃO =================
 
+"""
+Data transformation using previously calibrated parameters.
+
+Unlike the calibration stage, no new normalization parameters are
+computed here.
+
+The incoming data is transformed using the means and standard
+deviations obtained during training.
+"""
+
 def transform_amplitude_matrix(matrix, means, stds):
     clean = remove_invalid_packets(matrix)
 
@@ -367,6 +543,35 @@ def transform_bin_file(file_path, means, stds):
 
 # ================= DIAGNÓSTICO =================
 
+"""
+Dataset inspection utilities.
+
+These functions are not part of the preprocessing pipeline itself.
+
+Their purpose is to provide a quick overview of collected CSI files
+before training begins.
+
+The diagnostics help verify:
+
+    - Number of packets successfully decoded
+    - Number of packets converted to amplitude
+    - Number of packets remaining after cleaning
+    - Number of detected subcarriers
+
+This information is useful for identifying corrupted files,
+unexpected packet losses or inconsistencies between datasets.
+
+Example:
+
+    Raw packets:            54
+    Amplitude packets:      54
+    Valid packets:          53
+    Subcarriers detected:   192
+
+The diagnostics stage does not modify the data and is intended
+only for inspection and debugging purposes.
+"""
+
 def inspect_bin_file(file_path):
     packets = load_bin_file(file_path)
     amplitudes = packets_to_amplitude_matrix(packets)
@@ -383,6 +588,25 @@ def inspect_bin_file(file_path):
 
 
 # ================= DATASET COM JANELAS =================
+
+"""
+Sliding-window dataset generation.
+
+After preprocessing, the continuous CSI stream is divided into
+overlapping windows.
+
+Example:
+
+    Window size = 20
+    Step size   = 5
+
+    packets 1-20
+    packets 6-25
+    packets 11-30
+    ...
+
+Each window becomes one training sample for the classifier.
+"""
 
 def build_labeled_window_dataset(
     file_label_pairs,
