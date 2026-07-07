@@ -1,0 +1,72 @@
+SUBCARRIER VARIANCE DIAGNOSTICS
+======================================================================
+
+Files found: 265
+Amplitude rows before cleaning: 2502
+Valid rows after cleaning: 2458
+File loading errors: 0
+
+Configuration
+----------------------------------------------------------------------
+Correlation threshold: 0.4
+Minimum informative std: 1e-06
+Hampel window size: 5
+Hampel n sigmas: 3.0
+Moving average window size: 3
+
+Row length distribution before cleaning
+----------------------------------------------------------------------
+Length 64: 35
+Length 128: 9
+Length 192: 2458
+
+Stage summary
+----------------------------------------------------------------------
+clean_amplitude: rows=2458 | subcarriers=192 | zero_std=26 | informative=166 | min_std=0.0 | median_std=10.146488776173394 | max_std=14.749895278880382
+hampel: rows=2458 | subcarriers=192 | zero_std=26 | informative=166 | min_std=0.0 | median_std=9.418997697910143 | max_std=13.996257422981316
+moving_average: rows=2458 | subcarriers=192 | zero_std=26 | informative=166 | min_std=0.0 | median_std=8.529687197299658 | max_std=13.409830121256778
+zscore: rows=2458 | subcarriers=192 | zero_std=26 | informative=166 | min_std=0.0 | median_std=0.999999998827625 | max_std=0.9999999992542783
+
+Standard deviation threshold analysis
+----------------------------------------------------------------------
+
+clean_amplitude
+std > 0.0     : 166
+std > 1e-12   : 166
+std > 1e-09   : 166
+std > 1e-06   : 166
+std > 0.0001  : 166
+std > 0.001   : 166
+std > 0.01    : 166
+
+hampel
+std > 0.0     : 166
+std > 1e-12   : 166
+std > 1e-09   : 166
+std > 1e-06   : 166
+std > 0.0001  : 166
+std > 0.001   : 166
+std > 0.01    : 166
+
+moving_average
+std > 0.0     : 166
+std > 1e-12   : 166
+std > 1e-09   : 166
+std > 1e-06   : 166
+std > 0.0001  : 166
+std > 0.001   : 166
+std > 0.01    : 166
+
+zscore
+std > 0.0     : 166
+std > 1e-12   : 166
+std > 1e-09   : 166
+std > 1e-06   : 166
+std > 0.0001  : 166
+std > 0.001   : 166
+std > 0.01    : 166
+
+Selected subcarriers after correlation
+----------------------------------------------------------------------
+Total: 2
+[6, 45]

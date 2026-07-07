@@ -24,7 +24,7 @@ from Tools.preprocessing.feature_extraction import extract_features_from_window
 
 WINDOW_SIZE = 5
 STEP_SIZE = 2
-CORRELATION_THRESHOLD = 0.40
+CORRELATION_THRESHOLD = 0.95
 
 
 def save_json(path, data):

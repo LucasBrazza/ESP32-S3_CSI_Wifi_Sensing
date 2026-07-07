@@ -1,0 +1,63 @@
+FEATURE ANALYSIS REPORT
+======================================================================
+
+Selection method: fisher
+Top-K features: 30
+Original features: 126
+Selected features: 30
+
+Top selected features:
+Rank 01 | Feature 112 | SC 145 | peak_to_peak | Score 0.1280764615627458
+Rank 02 | Feature 109 | SC 145 | std | Score 0.1262170214885378
+Rank 03 | Feature 124 | SC 188 | peak_to_peak | Score 0.12109911173974891
+Rank 04 | Feature 121 | SC 188 | std | Score 0.11838767600324168
+Rank 05 | Feature 118 | SC 181 | peak_to_peak | Score 0.10567528434521445
+Rank 06 | Feature 115 | SC 181 | std | Score 0.10316402263206866
+Rank 07 | Feature 103 | SC 134 | std | Score 0.09932220676819845
+Rank 08 | Feature 23 | SC 34 | energy | Score 0.09897426898251915
+Rank 09 | Feature 106 | SC 134 | peak_to_peak | Score 0.09618207490903925
+Rank 10 | Feature 37 | SC 56 | std | Score 0.09038083165330217
+Rank 11 | Feature 40 | SC 56 | peak_to_peak | Score 0.08841306766477541
+Rank 12 | Feature 43 | SC 66 | std | Score 0.0859136341799837
+Rank 13 | Feature 46 | SC 66 | peak_to_peak | Score 0.08423159705966902
+Rank 14 | Feature 17 | SC 25 | energy | Score 0.0744094093276421
+Rank 15 | Feature 58 | SC 70 | peak_to_peak | Score 0.07147425874531568
+Rank 16 | Feature 31 | SC 49 | std | Score 0.06976874843521337
+Rank 17 | Feature 55 | SC 70 | std | Score 0.06972584066481997
+Rank 18 | Feature 34 | SC 49 | peak_to_peak | Score 0.06644764793498444
+Rank 19 | Feature 13 | SC 25 | std | Score 0.06505319631143469
+Rank 20 | Feature 98 | SC 117 | min | Score 0.06490407350734717
+Rank 21 | Feature 19 | SC 34 | std | Score 0.06266048546525925
+Rank 22 | Feature 22 | SC 34 | peak_to_peak | Score 0.06211893922912829
+Rank 23 | Feature 16 | SC 25 | peak_to_peak | Score 0.06002259664056796
+Rank 24 | Feature 96 | SC 117 | mean | Score 0.056110064751521756
+Rank 25 | Feature 25 | SC 42 | std | Score 0.05496669077910419
+Rank 26 | Feature 94 | SC 105 | peak_to_peak | Score 0.053164831818838396
+Rank 27 | Feature 7 | SC 15 | std | Score 0.05287179110887181
+Rank 28 | Feature 91 | SC 105 | std | Score 0.051557761912658165
+Rank 29 | Feature 64 | SC 74 | peak_to_peak | Score 0.051550667108840806
+Rank 30 | Feature 28 | SC 42 | peak_to_peak | Score 0.051505741401305954
+
+Subcarrier frequency:
+SC 34: 3
+SC 25: 3
+SC 145: 2
+SC 188: 2
+SC 181: 2
+SC 134: 2
+SC 56: 2
+SC 66: 2
+SC 70: 2
+SC 49: 2
+SC 117: 2
+SC 42: 2
+SC 105: 2
+SC 15: 1
+SC 74: 1
+
+Feature type frequency:
+peak_to_peak: 13
+std: 13
+energy: 2
+min: 1
+mean: 1

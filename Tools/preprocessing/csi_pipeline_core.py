@@ -98,7 +98,7 @@ from Tools.preprocessing.subcarrier_analysis import (
     select_subcarriers_from_ranking,
     print_ranked_subcarriers,
 )
-from decision_tree import (
+from Tools.classification.decision_tree import (
     build_tree,
     print_tree,
     leave_one_out_cross_validation,
@@ -115,7 +115,7 @@ from csi.csi_binary_io import read_packets
 WINDOW_SIZE = 20
 STEP_SIZE = 5
 TOP_K_FEATURES = 30
-CORRELATION_THRESHOLD = 0.40
+CORRELATION_THRESHOLD = 0.95
 
 FEATURES_PER_SUBCARRIER = 6
 

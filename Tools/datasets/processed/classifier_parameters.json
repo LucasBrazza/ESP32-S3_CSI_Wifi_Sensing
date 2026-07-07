@@ -1,0 +1,12 @@
+{
+    "model": "decision_tree",
+    "max_depth": 4,
+    "min_samples_split": 2,
+    "num_samples": 790,
+    "num_features": 30,
+    "class_count": {
+        "empty": 197,
+        "movement": 300,
+        "static_presence": 293
+    }
+}

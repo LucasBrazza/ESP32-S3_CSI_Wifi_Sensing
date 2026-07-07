@@ -1,0 +1,38 @@
+FEATURE DIAGNOSTICS
+============================================================
+
+Samples : 790
+Features: 126
+
+Zero variance features: 0
+
+Threshold analysis
+Score > 0        : 126
+Score > 0.0001   : 125
+Score > 0.001    : 122
+Score > 0.005    : 107
+Score > 0.01     : 98
+Score > 0.05     : 33
+
+Top 20 Fisher Scores
+
+01 | Feature 112 | Score 0.12807646
+02 | Feature 109 | Score 0.12621702
+03 | Feature 124 | Score 0.12109911
+04 | Feature 121 | Score 0.11838768
+05 | Feature 118 | Score 0.10567528
+06 | Feature 115 | Score 0.10316402
+07 | Feature 103 | Score 0.09932221
+08 | Feature  23 | Score 0.09897427
+09 | Feature 106 | Score 0.09618207
+10 | Feature  37 | Score 0.09038083
+11 | Feature  40 | Score 0.08841307
+12 | Feature  43 | Score 0.08591363
+13 | Feature  46 | Score 0.08423160
+14 | Feature  17 | Score 0.07440941
+15 | Feature  58 | Score 0.07147426
+16 | Feature  31 | Score 0.06976875
+17 | Feature  55 | Score 0.06972584
+18 | Feature  34 | Score 0.06644765
+19 | Feature  13 | Score 0.06505320
+20 | Feature  98 | Score 0.06490407
