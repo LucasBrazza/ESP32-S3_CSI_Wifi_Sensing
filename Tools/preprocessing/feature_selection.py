@@ -34,7 +34,7 @@ Pipeline position:
     decision tree training
 """
 
-from core_math import mean
+from Tools.preprocessing.core_math import mean
 
 
 def group_feature_values_by_label(feature_dataset, feature_index):

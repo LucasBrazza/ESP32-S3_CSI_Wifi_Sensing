@@ -43,7 +43,7 @@ computationally inexpensive and can be efficiently implemented in
 embedded systems such as the ESP32-S3.
 """
 
-from core_math import mean, std, get_column
+from Tools.preprocessing.core_math import mean, std, get_column
 
 
 def minimum(values):

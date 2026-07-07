@@ -69,7 +69,7 @@ if str(CLASSIFICATION_DIR) not in sys.path:
     sys.path.insert(0, str(CLASSIFICATION_DIR))
 
 
-from core_math import (
+from Tools.preprocessing.core_math import (
     mean,
     median,
     std,
@@ -81,19 +81,19 @@ from core_math import (
     copy_matrix,
 )
 
-from sliding_window import create_labeled_windows
-from feature_extraction import extract_feature_dataset
-from feature_selection import (
+from Tools.preprocessing.sliding_window import create_labeled_windows
+from Tools.preprocessing.feature_extraction import extract_feature_dataset
+from Tools.preprocessing.feature_selection import (
     rank_features_by_fisher_score,
     select_top_features,
 )
-from pipeline_parameters import save_pipeline_parameters
-from subcarrier_correlation import (
+from Tools.preprocessing.pipeline_parameters import save_pipeline_parameters
+from Tools.preprocessing.subcarrier_correlation import (
     select_non_redundant_subcarriers,
     filter_matrix_by_subcarriers,
     print_selected_subcarriers,
 )
-from subcarrier_analysis import (
+from Tools.preprocessing.subcarrier_analysis import (
     rank_subcarriers_by_occurrence,
     select_subcarriers_from_ranking,
     print_ranked_subcarriers,
@@ -215,18 +215,36 @@ def is_valid_amplitude_row(row):
     return total != 0
 
 
-def remove_invalid_packets(matrix):
+def get_most_common_row_length(matrix):
+    length_count = {}
+
+    for row in matrix:
+        if not row:
+            continue
+
+        if not is_valid_amplitude_row(row):
+            continue
+
+        row_length = len(row)
+        length_count[row_length] = length_count.get(row_length, 0) + 1
+
+    if not length_count:
+        return 0
+
+    return max(
+        length_count,
+        key=length_count.get,
+    )
+
+
+def remove_invalid_packets(matrix, expected_len=None):
     cleaned = []
 
     if not matrix:
         return cleaned
 
-    expected_len = 0
-
-    for row in matrix:
-        if row:
-            expected_len = len(row)
-            break
+    if expected_len is None:
+        expected_len = get_most_common_row_length(matrix)
 
     if expected_len == 0:
         return cleaned
@@ -241,7 +259,6 @@ def remove_invalid_packets(matrix):
         cleaned.append(row)
 
     return cleaned
-
 
 # ================= HAMPEL =================
 
@@ -508,7 +525,10 @@ deviations obtained during training.
 """
 
 def transform_amplitude_matrix(matrix, means, stds):
-    clean = remove_invalid_packets(matrix)
+    clean = remove_invalid_packets(
+        matrix,
+        expected_len=len(means),
+    )
 
     hampel = hampel_filter_matrix(
         clean,

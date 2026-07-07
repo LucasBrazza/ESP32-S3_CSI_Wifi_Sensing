@@ -42,7 +42,7 @@ Pearson is computationally simpler and more suitable for future
 embedded implementations.
 """
 
-from core_math import mean, std, get_column
+from Tools.preprocessing.core_math import mean, std, get_column
 
 
 def covariance(values_a, values_b):
