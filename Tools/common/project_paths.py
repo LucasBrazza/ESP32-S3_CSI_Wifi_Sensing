@@ -4,19 +4,23 @@ import sys
 TOOLS_DIR = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = TOOLS_DIR.parent
 
-DATASETS_DIR = TOOLS_DIR  / "datasets"
+DATASETS_DIR = TOOLS_DIR / "datasets"
 RAW_BIN_DIR = DATASETS_DIR / "raw_bin"
 PROCESSED_DIR = DATASETS_DIR / "processed"
 
+RESULTS_DIR = PROJECT_ROOT / "results"
+FIGURES_DIR = RESULTS_DIR / "figures"
+TABLES_DIR = RESULTS_DIR / "tables"
+REPORTS_DIR = RESULTS_DIR / "reports"
+LOGS_DIR = RESULTS_DIR / "logs"
+
 PREPROCESSING_DIR = TOOLS_DIR / "preprocessing"
+TRAINING_DIR = TOOLS_DIR / "training"
 CLASSIFICATION_DIR = TOOLS_DIR / "classification"
+REALTIME_DIR = TOOLS_DIR / "realtime"
 
 FEATURE_DATASET_FILE = PROCESSED_DIR / "feature_dataset.pkl"
 PREPROCESSING_PARAMETERS_FILE = PROCESSED_DIR / "preprocessing_parameters.json"
-
-PIPELINE_PARAMETERS_FILE = PREPROCESSING_DIR / "pipeline_parameters.json"
-
-TRAINING_DIR = TOOLS_DIR / "training"
 
 SELECTED_FEATURE_DATASET_FILE = PROCESSED_DIR / "selected_feature_dataset.pkl"
 FEATURE_RANKING_FILE = PROCESSED_DIR / "feature_ranking.json"
@@ -24,6 +28,7 @@ FEATURE_SELECTION_PARAMETERS_FILE = PROCESSED_DIR / "feature_selection_parameter
 
 CLASSIFIER_FILE = PROCESSED_DIR / "classifier.pkl"
 CLASSIFIER_PARAMETERS_FILE = PROCESSED_DIR / "classifier_parameters.json"
+
 FINAL_PIPELINE_PARAMETERS_FILE = PROCESSED_DIR / "pipeline_parameters.json"
 
 def setup_import_paths():
