@@ -22,6 +22,14 @@ from Tools.common.project_paths import (
     REPORTS_DIR,
 )
 
+from Tools.common.config import (
+    MIN_INFORMATIVE_STD,
+    HAMPEL_WINDOW_SIZE,
+    HAMPEL_N_SIGMAS,
+    MOVING_AVERAGE_WINDOW_SIZE,
+    FEATURES_PER_SUBCARRIER,
+)
+
 from Tools.preprocessing.csi_pipeline_core import (
     load_bin_file,
     packets_to_amplitude_matrix,
@@ -53,13 +61,7 @@ THRESHOLDS = [
     0.99,
 ]
 
-MIN_STD = 1e-6
-
-HAMPEL_WINDOW_SIZE = 5
-HAMPEL_N_SIGMAS = 3.0
-MOVING_AVERAGE_WINDOW_SIZE = 3
-
-FEATURES_PER_SUBCARRIER = 6
+MIN_STD = MIN_INFORMATIVE_STD
 
 
 # ================= BASIC MATH =================

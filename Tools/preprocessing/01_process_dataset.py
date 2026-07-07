@@ -7,9 +7,11 @@ from Tools.preprocessing.csi_pipeline_core import (
 )
 
 
-WINDOW_SIZE = 5
-STEP_SIZE = 2
-CORRELATION_THRESHOLD = 0.40
+from Tools.common.config import (
+    WINDOW_SIZE,
+    STEP_SIZE,
+    CORRELATION_THRESHOLD,
+)
 
 
 def build_file_label_pairs(dataset):

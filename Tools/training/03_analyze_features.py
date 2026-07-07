@@ -3,7 +3,12 @@ from collections import Counter
 
 import matplotlib.pyplot as plt
 
+from Tools.common.config import (
+    FEATURE_NAMES,
+)
+
 from Tools.common.io_utils import load_json
+
 from Tools.common.project_paths import (
     FEATURE_RANKING_FILE,
     FEATURE_SELECTION_PARAMETERS_FILE,
@@ -12,16 +17,6 @@ from Tools.common.project_paths import (
     FIGURES_DIR,
     REPORTS_DIR,
 )
-
-
-FEATURE_NAMES = [
-    "mean",
-    "std",
-    "min",
-    "max",
-    "peak_to_peak",
-    "energy",
-]
 
 
 def ensure_output_dirs():

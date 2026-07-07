@@ -22,9 +22,11 @@ from Tools.preprocessing.sliding_window import create_sliding_windows
 from Tools.preprocessing.feature_extraction import extract_features_from_window
 
 
-WINDOW_SIZE = 5
-STEP_SIZE = 2
-CORRELATION_THRESHOLD = 0.95
+from Tools.common.config import (
+    WINDOW_SIZE,
+    STEP_SIZE,
+    CORRELATION_THRESHOLD,
+)
 
 
 def save_json(path, data):

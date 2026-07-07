@@ -1,6 +1,12 @@
 import json
 import pickle
 
+from Tools.common.config import (
+    MODEL,
+    MAX_TREE_DEPTH,
+    MIN_SAMPLES_SPLIT,
+)
+
 from Tools.common.project_paths import (
     SELECTED_FEATURE_DATASET_FILE,
     CLASSIFIER_FILE,
@@ -10,9 +16,7 @@ from Tools.common.project_paths import (
 from Tools.classification.decision_tree import build_tree
 
 
-MODEL = "decision_tree"
-MAX_DEPTH = 4
-MIN_SAMPLES_SPLIT = 2
+MAX_DEPTH = MAX_TREE_DEPTH
 
 
 def load_pickle(path):

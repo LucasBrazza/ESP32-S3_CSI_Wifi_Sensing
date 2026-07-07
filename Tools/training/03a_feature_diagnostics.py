@@ -1,22 +1,9 @@
-"""
-Feature Diagnostics
-
-This script analyses the feature dataset before any modification of the
-feature selection strategy.
-
-It answers questions such as:
-
-- How many features have non-zero Fisher Score?
-- How many features have zero variance?
-- What is the Fisher Score distribution?
-- Should Top-K be adjusted?
-"""
-
 from collections import Counter
 
 import matplotlib.pyplot as plt
 
 from Tools.common.io_utils import load_json, load_pickle
+
 from Tools.common.project_paths import (
     FEATURE_DATASET_FILE,
     FEATURE_RANKING_FILE,

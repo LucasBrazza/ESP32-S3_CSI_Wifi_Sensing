@@ -1,6 +1,10 @@
 import json
 import pickle
 
+from Tools.common.config import (
+    TOP_K_FEATURES,
+)
+
 from Tools.common.project_paths import (
     FEATURE_DATASET_FILE,
     SELECTED_FEATURE_DATASET_FILE,
@@ -15,7 +19,6 @@ from Tools.preprocessing.feature_selection import (
 
 
 METHOD = "fisher"
-TOP_K_FEATURES = 30
 
 
 def load_pickle(path):
