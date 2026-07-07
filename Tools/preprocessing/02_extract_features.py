@@ -91,8 +91,10 @@ def main():
             features = extract_features_from_window(window)
 
             feature_dataset.append({
+                "sample_id": len(feature_dataset),
                 "label": item["label"],
                 "quadrant": item["quadrant"],
+                "source_file": item["path"],
                 "file_name": item["file_name"],
                 "window_index": window_index,
                 "features": features,
