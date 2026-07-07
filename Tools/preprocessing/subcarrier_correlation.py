@@ -127,66 +127,37 @@ def pearson_correlation(values_a, values_b, eps=1e-8):
     return cov / ((std_a * std_b) + eps)
 
 
-def select_non_redundant_subcarriers(matrix, threshold=0.95):
+def is_informative_signal(values, min_std=1e-6):
     """
-    Remove redundant subcarriers using Pearson correlation.
+    Check whether a subcarrier signal carries useful variation.
 
-    The algorithm evaluates each candidate subcarrier against the
-    already selected subcarriers.
+    Subcarriers with near-zero standard deviation are considered
+    non-informative because they remain almost constant across time.
 
-    Selection rule:
-
-        if |correlation| >= threshold
-
-            candidate is considered redundant
-
-        else
-
-            candidate is kept
-
-    Example:
-
-        threshold = 0.90
-
-        corr = 0.95 -> remove
-        corr = 0.82 -> keep
-
-    The result is a smaller set of subcarriers that preserves most
-    of the useful information while reducing computational cost.
-
-    This stage is particularly important for embedded deployment,
-    since fewer subcarriers lead to fewer features and less memory
-    consumption.
+    These subcarriers should not enter the correlation-based selection,
+    otherwise they may be incorrectly kept as non-redundant.
     """
+    if not values:
+        return False
 
-    if not matrix:
-        return []
+    return std(values) > min_std
 
-    num_subcarriers = len(matrix[0])
 
-    selected_subcarriers = []
+def is_informative_signal(values, min_std=1e-6):
+    """
+    Check whether a subcarrier signal carries useful variation.
 
-    for candidate_sc in range(num_subcarriers):
-        candidate_signal = get_column(matrix, candidate_sc)
+    Subcarriers with near-zero standard deviation are considered
+    non-informative because they remain almost constant across time.
 
-        is_redundant = False
+    These subcarriers should not enter the correlation-based selection,
+    otherwise they may be incorrectly kept as non-redundant.
+    """
+    if not values:
+        return False
 
-        for selected_sc in selected_subcarriers:
-            selected_signal = get_column(matrix, selected_sc)
+    return std(values) > min_std
 
-            corr = pearson_correlation(
-                candidate_signal,
-                selected_signal,
-            )
-
-            if abs(corr) >= threshold:
-                is_redundant = True
-                break
-
-        if not is_redundant:
-            selected_subcarriers.append(candidate_sc)
-
-    return selected_subcarriers
 
 
 def filter_matrix_by_subcarriers(matrix, selected_subcarriers):
@@ -232,3 +203,130 @@ def print_selected_subcarriers(selected_subcarriers):
     print("Subportadoras após remoção de redundância:")
     print(selected_subcarriers)
     print("Total:", len(selected_subcarriers))
+    
+
+# ================= INFORMATIVE SUBCARRIER FILTER =================
+
+def _local_mean(values):
+    if not values:
+        return 0.0
+
+    return sum(values) / len(values)
+
+
+def _local_std(values):
+    if not values:
+        return 0.0
+
+    avg = _local_mean(values)
+
+    total = 0.0
+
+    for value in values:
+        total += (value - avg) ** 2
+
+    return (total / len(values)) ** 0.5
+
+
+def _local_get_column(matrix, column_index):
+    column = []
+
+    for row in matrix:
+        column.append(row[column_index])
+
+    return column
+
+
+def pearson_correlation(signal_a, signal_b, eps=1e-8):
+    """
+    Compute Pearson correlation between two signals.
+    """
+    if not signal_a or not signal_b:
+        return 0.0
+
+    if len(signal_a) != len(signal_b):
+        return 0.0
+
+    mean_a = _local_mean(signal_a)
+    mean_b = _local_mean(signal_b)
+
+    numerator = 0.0
+    denominator_a = 0.0
+    denominator_b = 0.0
+
+    for i in range(len(signal_a)):
+        diff_a = signal_a[i] - mean_a
+        diff_b = signal_b[i] - mean_b
+
+        numerator += diff_a * diff_b
+        denominator_a += diff_a ** 2
+        denominator_b += diff_b ** 2
+
+    denominator = (denominator_a ** 0.5) * (denominator_b ** 0.5)
+
+    if denominator < eps:
+        return 0.0
+
+    return numerator / denominator
+
+
+def is_informative_signal(values, min_std=1e-6):
+    """
+    Check whether a subcarrier signal carries useful variation.
+
+    Subcarriers with near-zero standard deviation are considered
+    non-informative because they remain almost constant across time.
+    """
+    if not values:
+        return False
+
+    return _local_std(values) > min_std
+
+
+def select_non_redundant_subcarriers(
+    matrix,
+    threshold=0.95,
+    min_std=1e-6,
+):
+    """
+    Select non-redundant and informative subcarriers.
+
+    A subcarrier is kept only if:
+
+    1. It has meaningful temporal variation.
+    2. It is not highly correlated with a previously selected subcarrier.
+    """
+    if not matrix:
+        return []
+
+    num_subcarriers = len(matrix[0])
+
+    selected_subcarriers = []
+
+    for candidate_sc in range(num_subcarriers):
+        candidate_signal = _local_get_column(matrix, candidate_sc)
+
+        if not is_informative_signal(
+            candidate_signal,
+            min_std=min_std,
+        ):
+            continue
+
+        is_redundant = False
+
+        for selected_sc in selected_subcarriers:
+            selected_signal = _local_get_column(matrix, selected_sc)
+
+            correlation = pearson_correlation(
+                candidate_signal,
+                selected_signal,
+            )
+
+            if abs(correlation) >= threshold:
+                is_redundant = True
+                break
+
+        if not is_redundant:
+            selected_subcarriers.append(candidate_sc)
+
+    return selected_subcarriers
