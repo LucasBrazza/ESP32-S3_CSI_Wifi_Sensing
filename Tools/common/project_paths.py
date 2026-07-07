@@ -19,8 +19,12 @@ PIPELINE_PARAMETERS_FILE = PREPROCESSING_DIR / "pipeline_parameters.json"
 TRAINING_DIR = TOOLS_DIR / "training"
 
 SELECTED_FEATURE_DATASET_FILE = PROCESSED_DIR / "selected_feature_dataset.pkl"
-FISHER_RANKING_FILE = PROCESSED_DIR / "fisher_ranking.json"
+FEATURE_RANKING_FILE = PROCESSED_DIR / "feature_ranking.json"
 FEATURE_SELECTION_PARAMETERS_FILE = PROCESSED_DIR / "feature_selection_parameters.json"
+
+CLASSIFIER_FILE = PROCESSED_DIR / "classifier.pkl"
+CLASSIFIER_PARAMETERS_FILE = PROCESSED_DIR / "classifier_parameters.json"
+FINAL_PIPELINE_PARAMETERS_FILE = PROCESSED_DIR / "pipeline_parameters.json"
 
 def setup_import_paths():
     paths = [
