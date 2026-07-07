@@ -8,7 +8,7 @@ DATASETS_DIR = TOOLS_DIR / "datasets"
 RAW_BIN_DIR = DATASETS_DIR / "raw_bin"
 PROCESSED_DIR = DATASETS_DIR / "processed"
 
-RESULTS_DIR = PROJECT_ROOT / "results"
+RESULTS_DIR = DATASETS_DIR / "results"
 FIGURES_DIR = RESULTS_DIR / "figures"
 TABLES_DIR = RESULTS_DIR / "tables"
 REPORTS_DIR = RESULTS_DIR / "reports"

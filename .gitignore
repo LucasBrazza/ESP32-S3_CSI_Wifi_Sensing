@@ -4,10 +4,11 @@
 
 __pycache__/
 *.py[cod]
+*.pyd
 *$py.class
 
 # ==================================================
-# VIRTUAL ENVS
+# VIRTUAL ENVIRONMENTS
 # ==================================================
 
 venv/
@@ -16,7 +17,7 @@ env/
 ENV/
 
 # ==================================================
-# VS CODE / IDEs
+# IDEs
 # ==================================================
 
 .vscode/
@@ -31,25 +32,40 @@ Thumbs.db
 desktop.ini
 
 # ==================================================
-# DATASETS GERADOS
+# DATASETS
+#
+# raw_bin: dados brutos das aquisições
+# processed: artefatos intermediários regeneráveis
+#
+# Os resultados finais (datasets/results) DEVEM ser
+# versionados, pois fazem parte do TCC.
 # ==================================================
 
-Tools/datasets/
-Tools/serial_logger/datasets/
+datasets/raw_bin/
+datasets/processed/
 
 # ==================================================
-# ARQUIVOS GERADOS PELO PIPELINE
-# ==================================================
-
-
-# ==================================================
-# LOGS
+# LOGS / TEMPORARY FILES
 # ==================================================
 
 *.log
+*.tmp
+*.out
 
 # ==================================================
-# BUILD ESP-IDF
+# MATPLOTLIB CACHE
+# ==================================================
+
+.matplotlib/
+
+# ==================================================
+# JUPYTER
+# ==================================================
+
+.ipynb_checkpoints/
+
+# ==================================================
+# ESP-IDF BUILD
 # ==================================================
 
 AP_controller/build/
@@ -63,14 +79,14 @@ AP_controller/sdkconfig.old
 STA_CSI_receiver/sdkconfig.old
 
 # ==================================================
-# CONFIGURAÇÕES LOCAIS
+# LOCAL IDE CONFIGURATION
 # ==================================================
 
 AP_controller/.vscode/
 STA_CSI_receiver/.vscode/
 
 # ==================================================
-# SERIAL LOGGER
+# SERIAL LOGGER (GENERATED FILES)
 # ==================================================
 
 Tools/serial_logger/serial_logger_parsed.py
