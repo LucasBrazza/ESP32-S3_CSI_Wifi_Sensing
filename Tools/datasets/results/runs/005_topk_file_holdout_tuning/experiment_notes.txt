@@ -1,0 +1,54 @@
+Experiment 005 - Top-K tuning with file-based holdout
+
+Description:
+Controlled experiment varying the number of Fisher Score selected features while keeping the tuned decision tree parameters fixed.
+
+Motivation:
+Experiment 004 showed limited generalization to unseen acquisition files. This experiment evaluates whether the current top_k = 30 is adequate or whether another number of selected features improves file-based validation performance.
+
+Validation:
+- File-based stratified holdout 80/20
+- Random seed: 42
+
+Fixed classifier parameters:
+- Max tree depth: 6
+- Min samples split: 5
+
+Tested top_k values:
+[10, 20, 30, 40, 50, 70, 100]
+
+Dataset:
+- Total samples/windows: 790
+- Train samples/windows: 645
+- Test samples/windows: 145
+- Total files/groups: 232
+- Train files/groups: 186
+- Test files/groups: 46
+- Original features per sample: 126
+
+Class distribution by samples/windows:
+Class                    Total     Train      Test
+empty                      197       170        27
+static_presence            293       234        59
+movement                   300       241        59
+
+Class distribution by files/groups:
+Class                    Total     Train      Test
+empty                       51        41        10
+static_presence             91        73        18
+movement                    90        72        18
+
+Best result:
+- top_k: 70
+- accuracy: 0.551724
+- macro F1-score: 0.584280
+- weighted F1-score: 0.551952
+- empty F1-score: 0.730769
+- static_presence F1-score: 0.548387
+- movement F1-score: 0.473684
+
+Main observation:
+The experiment compares different feature vector sizes under the same file-based validation split. The best top_k should be compared with experiment 004, which used top_k = 30.
+
+Next step:
+If a better top_k is found, run a full validation experiment using that value and compare it with experiment 004.

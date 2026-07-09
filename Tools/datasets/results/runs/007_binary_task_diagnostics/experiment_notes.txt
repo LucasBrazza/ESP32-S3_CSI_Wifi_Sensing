@@ -1,0 +1,25 @@
+Experiment 007 - Binary task diagnostics
+
+Description:
+Diagnostic experiment separating the original three-class problem into two binary classification tasks.
+
+Task A:
+- empty vs presence
+- presence combines static_presence and movement
+
+Task B:
+- static_presence vs movement
+- only samples with presence are used
+
+Motivation:
+Experiment 006 showed improved detection of the empty class, but the model still confused static_presence and movement. This experiment checks whether the main limitation is presence detection or motion discrimination.
+
+Results:
+- Task A accuracy: 0.854167, macro F1-score: 0.733027
+- Task B accuracy: 0.582609, macro F1-score: 0.581818
+
+Main observation:
+If Task A performs clearly better than Task B, the main limitation is not detecting presence, but distinguishing stationary presence from movement.
+
+Next step:
+Use these results to decide whether a hierarchical classifier is worth testing.
