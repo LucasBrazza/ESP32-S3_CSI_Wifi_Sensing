@@ -1,0 +1,35 @@
+Experiment 021 - Scenario-based realtime stream simulation
+
+Objective:
+Build artificial continuous streams to evaluate how temporal decision strategies behave during class transitions.
+
+Scenario sequence:
+empty -> static_presence -> movement -> static_presence -> empty
+
+Model:
+- Gradient Boosting, n_estimators=20
+- max_depth=3
+- top_k=231
+
+Dataset:
+- Total samples/windows: 417
+- Features per sample: 231
+
+Simulation parameters:
+- Target windows per segment: 12
+- Scenarios per quadrant per seed: 3
+- Generated scenario evaluations: 720
+
+Best strategy:
+- strategy: raw_prediction
+- accuracy mean: 0.681481
+- macro F1 mean: 0.668983
+- movement F1 mean: 0.611422
+- final state changes mean: 20.344444
+- extra state changes mean: 16.344444
+- missing state changes mean: 0.000000
+- transition success rate mean: 0.983333
+- transition delay mean: 0.869444
+
+Important note:
+Scenario streams are artificially assembled from short files of the same class/quadrant. This allows realtime logic development before Dataset v2, but these metrics should not be treated as final model performance.
