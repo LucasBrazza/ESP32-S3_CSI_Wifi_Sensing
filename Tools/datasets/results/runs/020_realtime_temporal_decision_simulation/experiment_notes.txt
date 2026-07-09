@@ -1,0 +1,35 @@
+Experiment 020 - Realtime temporal decision simulation
+
+Objective:
+Simulate the decision layer that will be used in realtime after per-window CSI classification.
+
+Model:
+- Gradient Boosting, n_estimators=20
+- max_depth=3
+- top_k=231
+
+Temporal strategies:
+- raw_window_prediction
+- majority_vote_3
+- majority_vote_5
+- state_machine_confirm_2
+- state_machine_confirm_3
+
+Dataset:
+- Total samples/windows: 417
+- Features per sample: 231
+- Total file groups: 203
+- Minimum windows per file: 1
+- Maximum windows per file: 24
+- Mean windows per file: 2.054187
+
+Best temporal strategy:
+- strategy: majority_vote_5
+- accuracy mean: 0.690837
+- macro F1 mean: 0.691230
+- weighted F1 mean: 0.690972
+- movement F1 mean: 0.648355
+- mean state changes per file: 0.180488
+
+Important note:
+The current dataset has very short file sequences. Therefore, majority voting and state-machine behavior cannot be fully evaluated yet. This experiment is mainly used to establish the realtime simulation structure before Dataset v2.
