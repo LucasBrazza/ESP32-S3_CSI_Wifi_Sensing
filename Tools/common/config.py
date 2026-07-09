@@ -14,7 +14,7 @@ MOVING_AVERAGE_WINDOW_SIZE = 3
 
 # ================= FEATURE EXTRACTION =================
 
-FEATURES_PER_SUBCARRIER = 11
+FEATURES_PER_SUBCARRIER = 16
 
 FEATURE_NAMES = [
     "mean",
@@ -28,6 +28,11 @@ FEATURE_NAMES = [
     "diff_energy",
     "std_diff",
     "slope",
+    "iqr",
+    "mad",
+    "sliding_variance_mean",
+    "sliding_variance_std",
+    "autocorrelation_lag1",
 ]
 
 
