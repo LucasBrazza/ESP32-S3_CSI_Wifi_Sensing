@@ -1,20 +1,20 @@
 """
 Top-K Feature Tuning with File-Based Holdout
 
-Experiment 005
+Experiment 012
 
 This script evaluates different values of top_k for Fisher Score feature
-selection using the stricter file-based holdout validation.
+selection using file-based holdout validation.
 
-Unlike the regular training pipeline, this script does not overwrite the
-global selected_feature_dataset.pkl. It only runs experiments and saves
-the results under:
+The dataset is first split by acquisition file. Then, Fisher Score ranking
+is computed using only the training set. The selected feature indices are
+then applied to both training and test sets.
 
-    Tools/datasets/results/runs/005_topk_file_holdout_tuning/
+This avoids using test data during feature selection.
 
-Goal:
-    Evaluate whether the current top_k = 30 is adequate for generalizing
-    to unseen acquisition files.
+Results are saved under:
+
+    Tools/datasets/results/runs/012_topk_train_only_file_holdout/
 
 Fixed classifier configuration:
     MAX_TREE_DEPTH = 6
@@ -54,28 +54,20 @@ CLASS_ORDER = [
 TEST_SIZE = 0.20
 RANDOM_SEED = 42
 
-EXPERIMENT_ID = "005"
-EXPERIMENT_FOLDER_NAME = "005_topk_file_holdout_tuning"
+EXPERIMENT_ID = "012"
+EXPERIMENT_FOLDER_NAME = "012_topk_train_only_file_holdout"
 
 TOP_K_VALUES = [
-    10,
-    20,
     30,
-    40,
-    50,
     70,
     100,
+    126,
 ]
 
 
 # ================= FEATURE SELECTION =================
 
-def select_top_features_preserving_metadata(feature_dataset, ranking, top_k):
-    selected_indices = []
-
-    for item in ranking[:top_k]:
-        selected_indices.append(item["feature_index"])
-
+def select_features_by_indices(feature_dataset, selected_indices):
     selected_dataset = []
 
     for sample in feature_dataset:
@@ -94,7 +86,7 @@ def select_top_features_preserving_metadata(feature_dataset, ranking, top_k):
 
         selected_dataset.append(selected_sample)
 
-    return selected_dataset, selected_indices
+    return selected_dataset
 
 
 # ================= DATASET HELPERS =================
@@ -495,7 +487,7 @@ def get_experiment_paths():
         "run_dir": run_dir,
         "tables_dir": tables_dir,
         "reports_dir": reports_dir,
-        "topk_results": tables_dir / "topk_file_holdout_results.csv",
+        "topk_results": tables_dir / "topk_tuning_results.csv",
         "best_confusion_matrix": tables_dir / "best_confusion_matrix.csv",
         "best_class_metrics": tables_dir / "best_class_metrics.csv",
         "best_quadrant_metrics": tables_dir / "best_quadrant_metrics.csv",
@@ -679,7 +671,7 @@ def save_experiment_notes(
 
     lines = []
 
-    lines.append("Experiment 005 - Top-K tuning with file-based holdout")
+    lines.append("Experiment 012 - Train-only Top-K tuning with file-based holdout")
     lines.append("")
     lines.append("Description:")
     lines.append(
@@ -689,15 +681,21 @@ def save_experiment_notes(
     lines.append("")
     lines.append("Motivation:")
     lines.append(
-        "Experiment 004 showed limited generalization to unseen acquisition "
-        "files. This experiment evaluates whether the current top_k = 30 "
-        "is adequate or whether another number of selected features improves "
-        "file-based validation performance."
+        "Previous top_k experiments computed the Fisher Score ranking before "
+        "the train/test split. This experiment corrects the methodology by "
+        "splitting the dataset by acquisition file first, computing the Fisher "
+        "Score ranking only on the training set, and then applying the selected "
+        "feature indices to both training and test sets."
     )
     lines.append("")
     lines.append("Validation:")
     lines.append("- File-based stratified holdout 80/20")
     lines.append(f"- Random seed: {RANDOM_SEED}")
+    lines.append("")
+    lines.append("Feature selection:")
+    lines.append("- Fisher Score ranking computed only on training data")
+    lines.append("- Test data is not used to rank or select features")
+    lines.append("- Selected feature indices are applied to both train and test sets")
     lines.append("")
     lines.append("Fixed classifier parameters:")
     lines.append(f"- Max tree depth: {MAX_TREE_DEPTH}")
@@ -714,6 +712,7 @@ def save_experiment_notes(
     lines.append(f"- Train files/groups: {len(train_groups)}")
     lines.append(f"- Test files/groups: {len(test_groups)}")
     lines.append(f"- Original features per sample: {len(feature_dataset[0]['features'])}")
+    lines.append(f"- Selected features in best result: {best_result['top_k']}")
     lines.append("")
     lines.append("Class distribution by samples/windows:")
     lines.append(f"{'Class':<20}{'Total':>10}{'Train':>10}{'Test':>10}")
@@ -750,15 +749,17 @@ def save_experiment_notes(
     lines.append("")
     lines.append("Main observation:")
     lines.append(
-        "The experiment compares different feature vector sizes under the "
-        "same file-based validation split. The best top_k should be compared "
-        "with experiment 004, which used top_k = 30."
+        "This experiment provides a cleaner estimate of top_k performance, "
+        "because the feature ranking is learned only from the training data. "
+        "The result should be compared with experiments 006 and 011, which "
+        "used feature selections obtained before this methodological correction."
     )
     lines.append("")
     lines.append("Next step:")
     lines.append(
-        "If a better top_k is found, run a full validation experiment using "
-        "that value and compare it with experiment 004."
+        "If the result remains close to the previous best configuration, the "
+        "pipeline can proceed to temporal feature engineering. If performance "
+        "drops significantly, previous results should be treated as optimistic."
     )
 
     with open(output_path, "w", encoding="utf-8") as file:
@@ -830,8 +831,16 @@ def run_experiment():
 
     labels = get_labels(feature_dataset)
 
-    print("Ranking features using Fisher Score...")
-    ranking = rank_features_by_fisher_score(feature_dataset)
+    print("Splitting dataset by file before feature selection...")
+
+    full_train_dataset, full_test_dataset, train_groups, test_groups = file_stratified_holdout_split(
+        feature_dataset,
+        test_size=TEST_SIZE,
+        seed=RANDOM_SEED,
+    )
+
+    print("Ranking features using Fisher Score on training data only...")
+    ranking = rank_features_by_fisher_score(full_train_dataset)
 
     valid_top_k_values = []
 
@@ -854,17 +863,22 @@ def run_experiment():
             f"Evaluating top_k={top_k}"
         )
 
-        selected_dataset, selected_indices = select_top_features_preserving_metadata(
-            feature_dataset,
-            ranking,
-            top_k,
+        selected_indices = []
+
+        for item in ranking[:top_k]:
+            selected_indices.append(item["feature_index"])
+
+        train_dataset = select_features_by_indices(
+            full_train_dataset,
+            selected_indices,
         )
 
-        train_dataset, test_dataset, train_groups, test_groups = file_stratified_holdout_split(
-            selected_dataset,
-            test_size=TEST_SIZE,
-            seed=RANDOM_SEED,
+        test_dataset = select_features_by_indices(
+            full_test_dataset,
+            selected_indices,
         )
+        
+        selected_dataset = train_dataset + test_dataset
 
         tree = decision_tree.build_tree(
             train_dataset,
