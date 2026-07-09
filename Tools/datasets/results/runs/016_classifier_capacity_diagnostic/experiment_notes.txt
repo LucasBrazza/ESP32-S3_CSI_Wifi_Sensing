@@ -1,0 +1,46 @@
+Experiment 016 - Classifier capacity diagnostic
+
+Objective:
+Compare stronger classifiers on the current CSI feature dataset to verify whether the custom decision tree is too simple for the problem.
+
+Validation:
+- File-based stratified holdout 80/20
+- Random seed: 42
+
+Feature selection:
+- Fisher Score ranking computed only on training data
+- Same selected feature indices applied to train and test sets
+
+Dataset:
+- Total samples/windows: 417
+- Train samples/windows: 344
+- Test samples/windows: 73
+- Total files/groups: 203
+- Train files/groups: 162
+- Test files/groups: 41
+- Original features per sample: 231
+
+Class distribution by samples/windows:
+Class                    Total     Train      Test
+empty                      120       105        15
+static_presence            147       119        28
+movement                   150       120        30
+
+Class distribution by files/groups:
+Class                    Total     Train      Test
+empty                       45        36         9
+static_presence             78        62        16
+movement                    80        64        16
+
+Best result:
+- classifier: gradient_boosting
+- top_k: 126
+- accuracy: 0.712329
+- macro F1-score: 0.730927
+- weighted F1-score: 0.714537
+- empty F1-score: 0.814815
+- static_presence F1-score: 0.700000
+- movement F1-score: 0.677966
+
+Interpretation rule:
+If stronger classifiers substantially outperform the custom decision tree, the current decision tree is likely too simple. If all models remain close to the same performance range, the main bottleneck is more likely related to dataset quality, feature representation, or preprocessing.
