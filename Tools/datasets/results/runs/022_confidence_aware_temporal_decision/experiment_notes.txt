@@ -1,0 +1,39 @@
+Experiment 022 - Confidence-aware temporal decision simulation
+
+Objective:
+Evaluate confidence-aware temporal rules to reduce false state changes while preserving class transition responsiveness.
+
+Scenario sequence:
+empty -> static_presence -> movement -> static_presence -> empty
+
+Model:
+- Gradient Boosting, n_estimators=20
+- max_depth=3
+- top_k=231
+
+Dataset:
+- Total samples/windows: 417
+- Features per sample: 231
+
+Simulation parameters:
+- Target windows per segment: 12
+- Scenarios per quadrant per seed: 3
+- Generated scenario evaluations: 990
+
+Best strategy by realtime score:
+- strategy: majority_vote_3
+- realtime score mean: 0.604674
+- accuracy mean: 0.677963
+- macro F1 mean: 0.664979
+- movement F1 mean: 0.637322
+- final state changes mean: 12.522222
+- extra state changes mean: 8.522222
+- missing state changes mean: 0.000000
+- transition success rate mean: 0.972222
+- transition delay mean: 1.769444
+
+Realtime score:
+The realtime score is macro F1 penalized by extra state changes, missing state changes, and transition delay. It is used only to compare temporal decision strategies.
+
+Important note:
+Scenario streams are artificially assembled from short files of the same class/quadrant. This allows realtime logic development before Dataset v2, but these metrics should not be treated as final model performance.
