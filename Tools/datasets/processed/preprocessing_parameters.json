@@ -414,6 +414,6 @@
         188
     ],
     "num_selected_subcarriers": 21,
-    "features_per_sample": 336,
+    "features_per_sample": 231,
     "num_samples": 417
 }
