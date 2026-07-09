@@ -1,0 +1,52 @@
+CLASSIFIER VALIDATION REPORT
+======================================================================
+
+Model: decision_tree
+Validation method: Stratified holdout 80/20
+Random seed: 42
+Total samples: 790
+Train samples: 632
+Test samples: 158
+Features per sample: 30
+Max tree depth: 6
+Min samples split: 5
+
+Class distribution
+----------------------------------------------------------------------
+Class                    Total     Train      Test
+empty                      197       158        39
+static_presence            293       234        59
+movement                   300       240        60
+
+Overall metrics
+----------------------------------------------------------------------
+Accuracy: 0.620253
+Macro precision: 0.625501
+Macro recall: 0.614400
+Macro F1-score: 0.608970
+Weighted precision: 0.647642
+Weighted recall: 0.620253
+Weighted F1-score: 0.622193
+
+Per-class metrics
+----------------------------------------------------------------------
+empty: precision=0.458333 | recall=0.564103 | f1=0.505747 | support=39
+static_presence: precision=0.637681 | recall=0.745763 | f1=0.687500 | support=59
+movement: precision=0.780488 | recall=0.533333 | f1=0.633663 | support=60
+
+Per-quadrant metrics
+----------------------------------------------------------------------
+quad1: accuracy=0.511628 | correct=22 | support=43
+quad2: accuracy=0.571429 | correct=16 | support=28
+quad3: accuracy=0.714286 | correct=20 | support=28
+quad4: accuracy=0.575758 | correct=19 | support=33
+quad5: accuracy=0.807692 | correct=21 | support=26
+
+Confusion matrix
+----------------------------------------------------------------------
+Rows = true labels | Columns = predicted labels
+
+                                 empty   static_presence          movement
+empty                               22                13                 4
+static_presence                     10                44                 5
+movement                            16                12                32
