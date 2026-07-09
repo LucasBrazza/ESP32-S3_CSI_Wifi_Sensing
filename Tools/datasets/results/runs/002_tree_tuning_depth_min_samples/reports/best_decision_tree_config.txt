@@ -1,0 +1,32 @@
+BEST DECISION TREE CONFIGURATION
+======================================================================
+
+Experiment: 002 - 002_tree_tuning_depth_min_samples
+
+Selection criterion:
+Highest macro F1-score, then highest accuracy, then smaller tree.
+
+Best parameters:
+- max_depth: 6
+- min_samples_split: 5
+
+Validation metrics:
+- accuracy: 0.620253
+- macro_f1: 0.608970
+- weighted_f1: 0.622193
+
+Per-class F1-score:
+- empty: 0.505747
+- static_presence: 0.687500
+- movement: 0.633663
+
+Per-class recall:
+- empty: 0.564103
+- static_presence: 0.745763
+- movement: 0.533333
+
+Tree complexity:
+- total nodes: 75
+- decision nodes: 37
+- leaf nodes: 38
+- actual max depth: 6
