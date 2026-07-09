@@ -1,0 +1,3 @@
+experiment_id,folder,description,model,validation_method,top_k,max_depth,min_samples_split,accuracy,macro_f1,weighted_f1,main_observation
+000,000_previous_loocv_attempt,Previous LOOCV validation attempt,decision_tree,LOOCV,30,4,2,,,,Not completed due to high execution time
+001,001_holdout_baseline_depth4_min2_top30,Initial stratified holdout baseline,decision_tree,Stratified holdout 80/20,30,4,2,0.582278,0.534149,0.556645,Low recall for empty class and strong variation by quadrant

@@ -228,10 +228,18 @@ def select_top_features(feature_dataset, ranking, top_k=30):
     This reduces dimensionality and computational cost before training
     the classifier.
 
+    Important:
+
+        The selected dataset must preserve metadata such as quadrant,
+        file_name and window_index. These fields are not used directly
+        by the decision tree, but they are required for validation,
+        diagnostics and quadrant-based analysis.
+
     The function returns:
 
         selected_dataset:
-            dataset containing only the selected features
+            dataset containing only the selected features, while
+            preserving sample metadata
 
         selected_indices:
             original feature indices kept from the full feature vector
@@ -252,11 +260,14 @@ def select_top_features(feature_dataset, ranking, top_k=30):
         for index in selected_indices:
             selected_features.append(item["features"][index])
 
-        selected_dataset.append(
-            {
-                "label": item["label"],
-                "features": selected_features,
-            }
-        )
+        selected_item = {}
+
+        for key in item:
+            if key != "features":
+                selected_item[key] = item[key]
+
+        selected_item["features"] = selected_features
+
+        selected_dataset.append(selected_item)
 
     return selected_dataset, selected_indices

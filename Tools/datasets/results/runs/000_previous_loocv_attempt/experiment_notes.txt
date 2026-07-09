@@ -1,0 +1,19 @@
+Experiment 000 - Previous LOOCV attempt
+
+Description:
+Initial attempt to validate the decision tree using Leave-One-Out Cross-Validation.
+
+Status:
+Not completed.
+
+Reason:
+LOOCV trains one decision tree for each sample in the dataset. Since the selected dataset contains hundreds of samples, the execution time became too high for the current validation stage.
+
+Observation:
+This attempt was useful to discard LOOCV as the initial validation strategy. Although LOOCV can be useful for very small datasets, it was not practical for this project at this point.
+
+Decision:
+Replace LOOCV with stratified holdout 80/20 as the first practical validation strategy.
+
+Next experiment:
+001_holdout_baseline_depth4_min2_top30
