@@ -1,0 +1,33 @@
+BEST TOP-K CONFIGURATION - FILE-BASED HOLDOUT
+======================================================================
+
+Experiment: 010 - 010_topk126_file_holdout_check
+
+Selection criterion:
+Highest macro F1-score, then highest accuracy, then smaller top_k.
+
+Best configuration:
+- top_k: 126
+- max_depth: 6
+- min_samples_split: 5
+
+Validation metrics:
+- accuracy: 0.579310
+- macro_f1: 0.585651
+- weighted_f1: 0.572098
+
+Per-class F1-score:
+- empty: 0.647059
+- static_presence: 0.595041
+- movement: 0.514851
+
+Per-class recall:
+- empty: 0.814815
+- static_presence: 0.610169
+- movement: 0.440678
+
+Tree complexity:
+- total nodes: 59
+- decision nodes: 29
+- leaf nodes: 30
+- actual max depth: 6

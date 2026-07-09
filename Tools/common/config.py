@@ -28,7 +28,7 @@ FEATURE_NAMES = [
 
 # ================= FEATURE SELECTION =================
 
-TOP_K_FEATURES = 70
+TOP_K_FEATURES = 126
 FISHER_MINIMUM_SCORE = 0.0
 
 

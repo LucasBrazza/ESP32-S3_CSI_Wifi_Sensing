@@ -1,0 +1,24 @@
+Experiment 009 - Static presence vs movement feature diagnostics
+
+Description:
+Diagnostic experiment focused only on distinguishing static_presence from movement.
+
+Motivation:
+Previous experiments showed that the main limitation is not presence detection, but the separation between stationary presence and movement.
+
+Method:
+- Use only static_presence and movement samples
+- Recompute Fisher Score ranking for this binary task
+- Test multiple top_k values
+- Validate using file-based stratified holdout
+
+Best result:
+- top_k: 126
+- accuracy: 0.573913
+- macro F1-score: 0.572750
+- weighted F1-score: 0.571393
+- static_presence F1-score: 0.595041
+- movement F1-score: 0.550459
+
+Next step:
+If this binary task remains weak, the next improvement should focus on temporal/window features rather than only feature count.
