@@ -54,14 +54,18 @@ CLASS_ORDER = [
 TEST_SIZE = 0.20
 RANDOM_SEED = 42
 
-EXPERIMENT_ID = "012"
-EXPERIMENT_FOLDER_NAME = "012_topk_train_only_file_holdout"
+EXPERIMENT_ID = "013"
+EXPERIMENT_FOLDER_NAME = "013_temporal_features_topk_train_only_file_holdout"
 
 TOP_K_VALUES = [
     30,
     70,
     100,
     126,
+    150,
+    180,
+    200,
+    231,
 ]
 
 
