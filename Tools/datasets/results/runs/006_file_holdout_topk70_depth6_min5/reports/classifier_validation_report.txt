@@ -1,0 +1,78 @@
+FILE-BASED HOLDOUT VALIDATION REPORT
+======================================================================
+
+Experiment: 006 - 006_file_holdout_topk70_depth6_min5
+Model: decision_tree
+Validation method: File-based stratified holdout 80/20
+Random seed: 42
+
+Dataset:
+- Total samples/windows: 790
+- Train samples/windows: 645
+- Test samples/windows: 145
+- Total files/groups: 232
+- Train files/groups: 186
+- Test files/groups: 46
+- Features per sample: 70
+
+Classifier parameters:
+- Max tree depth: 6
+- Min samples split: 5
+
+Tree complexity:
+- Total nodes: 67
+- Decision nodes: 33
+- Leaf nodes: 34
+- Actual max depth: 6
+
+Class distribution by samples/windows
+----------------------------------------------------------------------
+Class                    Total     Train      Test
+empty                      197       170        27
+static_presence            293       234        59
+movement                   300       241        59
+
+Class distribution by files/groups
+----------------------------------------------------------------------
+Class                    Total     Train      Test
+empty                       51        41        10
+static_presence             91        73        18
+movement                    90        72        18
+
+Overall metrics
+----------------------------------------------------------------------
+Accuracy: 0.551724
+Macro precision: 0.591329
+Macro recall: 0.579201
+Macro F1-score: 0.584280
+Weighted precision: 0.554105
+Weighted recall: 0.551724
+Weighted F1-score: 0.551952
+
+Per-class metrics
+----------------------------------------------------------------------
+empty: precision=0.760000 | recall=0.703704 | f1=0.730769 | support=27
+static_presence: precision=0.523077 | recall=0.576271 | f1=0.548387 | support=59
+movement: precision=0.490909 | recall=0.457627 | f1=0.473684 | support=59
+
+Per-quadrant metrics
+----------------------------------------------------------------------
+quad1: accuracy=0.564103 | correct=22 | support=39
+quad2: accuracy=0.509804 | correct=26 | support=51
+quad3: accuracy=0.500000 | correct=11 | support=22
+quad4: accuracy=0.421053 | correct=8 | support=19
+quad5: accuracy=0.928571 | correct=13 | support=14
+
+File-level metrics summary
+----------------------------------------------------------------------
+Test files evaluated: 46
+Average file accuracy: 0.543478
+
+Confusion matrix
+----------------------------------------------------------------------
+Rows = true labels | Columns = predicted labels
+
+                                 empty   static_presence          movement
+empty                               19                 3                 5
+static_presence                      2                34                23
+movement                             4                28                27

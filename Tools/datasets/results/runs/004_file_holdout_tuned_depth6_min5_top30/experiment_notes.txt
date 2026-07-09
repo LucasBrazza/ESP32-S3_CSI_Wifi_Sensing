@@ -1,0 +1,25 @@
+Experiment 004 - File-based holdout validation
+
+Description:
+Validation of the tuned decision tree using file-based holdout. All windows generated from the same acquisition file are kept together either in training or in testing.
+
+Motivation:
+Previous holdout experiments split individual windows randomly. That strategy is useful as an initial validation, but it can be optimistic because different windows from the same acquisition may be very similar. File-based splitting provides a stricter evaluation.
+
+Configuration:
+- Validation method: file-based stratified holdout 80/20
+- Random seed: 42
+- Max tree depth: 6
+- Min samples split: 5
+- Top-K selected features: 30
+
+Results:
+- Accuracy: 0.517241
+- Macro F1-score: 0.500310
+- Weighted F1-score: 0.523609
+
+Main observation:
+This result should be compared with experiment 003. If performance drops significantly, it indicates that the window-based holdout was benefiting from similarity between windows from the same acquisition file.
+
+Next step:
+Analyze the difference between experiments 003 and 004, focusing on whether the model generalizes to unseen acquisition files.

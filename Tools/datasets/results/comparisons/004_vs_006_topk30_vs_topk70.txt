@@ -1,0 +1,41 @@
+Comparison - Experiment 004 vs Experiment 006
+
+Objective:
+Compare file-based holdout validation using top_k=30 and top_k=70.
+
+Experiment 004:
+- Name: 004_file_holdout_tuned_depth6_min5_top30
+- Validation: file-based stratified holdout 80/20
+- Top-K features: 30
+- Max tree depth: 6
+- Min samples split: 5
+- Accuracy: 0.517241
+- Macro F1-score: 0.500310
+- Weighted F1-score: 0.523609
+
+Experiment 006:
+- Name: 006_file_holdout_topk70_depth6_min5
+- Validation: file-based stratified holdout 80/20
+- Top-K features: 70
+- Max tree depth: 6
+- Min samples split: 5
+- Accuracy: 0.551724
+- Macro F1-score: 0.584280
+- Weighted F1-score: 0.551952
+
+Observed improvement:
+- Accuracy increased by 0.034483
+- Macro F1-score increased by 0.083970
+- Weighted F1-score increased by 0.028343
+
+Main interpretation:
+Increasing the number of selected features from 30 to 70 improved the file-based validation performance, especially in terms of macro F1-score. This indicates that the previous feature vector was probably too restrictive for generalization to unseen acquisition files.
+
+Per-class interpretation:
+The empty class improved substantially, reaching precision of 0.760000, recall of 0.703704 and F1-score of 0.730769. This suggests that top_k=70 improved the model's ability to distinguish absence from presence.
+
+Remaining limitation:
+The main limitation is now the confusion between static_presence and movement. In experiment 006, 23 static_presence samples were classified as movement, while 28 movement samples were classified as static_presence. This indicates that the current feature set and decision tree still have difficulty separating stationary presence from motion.
+
+Conclusion:
+Experiment 006 should be considered the current best file-based decision tree configuration. The next development step should focus on improving the distinction between static_presence and movement.
