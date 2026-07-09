@@ -1,0 +1,42 @@
+Embedded model snapshot - Experiment 023
+
+Candidate model:
+- GradientBoostingClassifier
+- n_estimators: 20
+- max_depth: 3
+- top_k: 231
+
+Important structure observation:
+- Because this is a multiclass GradientBoostingClassifier, the model uses one regression tree per class per boosting stage.
+- Total trees: 60 (20 stages x 3 classes)
+
+Full dataset seed 42 structure:
+- Total nodes: 898
+- Internal decision nodes: 419
+- Leaf nodes: 479
+- Max depth: 3
+- Used original features: 129
+- Mean comparisons per window: 179.971223
+- Max comparisons per window: 180
+
+Top used features:
+- feature_index=69, subcarrier=56, feature=max, splits=23
+- feature_index=38, subcarrier=34, feature=energy, splits=19
+- feature_index=202, subcarrier=145, feature=peak_to_peak, splits=13
+- feature_index=104, subcarrier=70, feature=energy, splits=11
+- feature_index=194, subcarrier=134, feature=max_abs_diff, splits=11
+- feature_index=49, subcarrier=42, feature=energy, splits=11
+- feature_index=78, subcarrier=66, feature=std, splits=9
+- feature_index=225, subcarrier=188, feature=energy, splits=9
+- feature_index=93, subcarrier=67, feature=energy, splits=9
+- feature_index=221, subcarrier=188, feature=std, splits=8
+- feature_index=82, subcarrier=66, feature=energy, splits=8
+- feature_index=24, subcarrier=25, feature=min, splits=7
+- feature_index=172, subcarrier=105, feature=max_abs_diff, splits=7
+- feature_index=200, subcarrier=145, feature=min, splits=7
+- feature_index=29, subcarrier=25, feature=max_abs_diff, splits=7
+
+Embedded interpretation:
+- The model is still structurally simple compared with neural networks, but it is larger than a single decision tree.
+- For embedded implementation, it should be converted to fixed arrays or hardcoded tree traversal logic.
+- The final export should be repeated after Dataset v2, because the current model is still trained on a limited dataset.

@@ -1,0 +1,34 @@
+Experiment 023 - Candidate model structure export
+
+Objective:
+Inspect the current candidate model structure to estimate embedded feasibility before implementing the realtime version.
+
+Candidate model:
+- Gradient Boosting, n_estimators=20
+- max_depth=3
+- top_k=231
+
+Key observation:
+Because the problem has three classes, scikit-learn's multiclass GradientBoostingClassifier uses one regression tree per class per boosting stage.
+Therefore, the candidate model contains 60 trees, not only 20 trees.
+
+Full dataset seed 42 structure:
+- Total trees: 60
+- Total nodes: 898
+- Internal decision nodes: 419
+- Leaf nodes: 479
+- Max depth: 3
+- Used original features: 129
+- Mean comparisons per window: 179.971223
+- Max comparisons per window: 180
+
+Repeated holdout structure summary:
+- Seeds: 10
+- Total trees mean: 60.000000
+- Total nodes mean: 897.400000
+- Internal decision nodes mean: 418.700000
+- Used original features mean: 129.000000
+- Mean comparisons per window: 179.950103
+
+Conclusion:
+The model is feasible to analyze and export, but it is not as small as the n_estimators value alone suggests. The next implementation step should convert the trained structure into an embedded-friendly representation using arrays or generated code.
