@@ -1,3 +1,4 @@
+import argparse
 import json
 import pickle
 
@@ -21,12 +22,33 @@ from Tools.preprocessing.subcarrier_correlation import (
 from Tools.preprocessing.sliding_window import create_sliding_windows
 from Tools.preprocessing.feature_extraction import extract_features_from_window
 
-
 from Tools.common.config import (
     WINDOW_SIZE,
     STEP_SIZE,
     CORRELATION_THRESHOLD,
 )
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Extract CSI features using configurable window and step sizes."
+    )
+
+    parser.add_argument(
+        "--window-size",
+        type=int,
+        default=WINDOW_SIZE,
+        help="Sliding window size. Defaults to Tools.common.config.WINDOW_SIZE.",
+    )
+
+    parser.add_argument(
+        "--step-size",
+        type=int,
+        default=STEP_SIZE,
+        help="Sliding window step size. Defaults to Tools.common.config.STEP_SIZE.",
+    )
+
+    return parser.parse_args()
 
 
 def save_json(path, data):
@@ -43,12 +65,23 @@ def save_pickle(path, data):
         pickle.dump(data, file)
 
 
-def main():
+def run_extraction(window_size, step_size):
+    if window_size <= 0:
+        raise ValueError("window_size must be greater than zero.")
+
+    if step_size <= 0:
+        raise ValueError("step_size must be greater than zero.")
+
     dataset = load_dataset()
 
     print_dataset_summary(dataset)
 
     file_paths = [item["path"] for item in dataset]
+
+    print()
+    print("Configuração de janelamento:")
+    print("Window size:", window_size)
+    print("Step size:", step_size)
 
     print()
     print("Ajustando parâmetros de pré-processamento...")
@@ -85,26 +118,28 @@ def main():
 
         windows = create_sliding_windows(
             reduced,
-            window_size=WINDOW_SIZE,
-            step_size=STEP_SIZE,
+            window_size=window_size,
+            step_size=step_size,
         )
 
         for window_index, window in enumerate(windows):
             features = extract_features_from_window(window)
 
-            feature_dataset.append({
-                "sample_id": len(feature_dataset),
-                "label": item["label"],
-                "quadrant": item["quadrant"],
-                "source_file": item["path"],
-                "file_name": item["file_name"],
-                "window_index": window_index,
-                "features": features,
-            })
+            feature_dataset.append(
+                {
+                    "sample_id": len(feature_dataset),
+                    "label": item["label"],
+                    "quadrant": item["quadrant"],
+                    "source_file": item["path"],
+                    "file_name": item["file_name"],
+                    "window_index": window_index,
+                    "features": features,
+                }
+            )
 
     preprocessing_parameters = {
-        "window_size": WINDOW_SIZE,
-        "step_size": STEP_SIZE,
+        "window_size": window_size,
+        "step_size": step_size,
         "correlation_threshold": CORRELATION_THRESHOLD,
         "means": means,
         "stds": stds,
@@ -131,10 +166,21 @@ def main():
 
     print()
     print("Resumo final:")
+    print("Window size:", window_size)
+    print("Step size:", step_size)
     print("Amostras:", len(feature_dataset))
 
     if feature_dataset:
         print("Features por amostra:", len(feature_dataset[0]["features"]))
+
+
+def main():
+    args = parse_args()
+
+    run_extraction(
+        window_size=args.window_size,
+        step_size=args.step_size,
+    )
 
 
 if __name__ == "__main__":

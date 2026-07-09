@@ -1,6 +1,6 @@
 # ================= PREPROCESSING =================
 
-WINDOW_SIZE = 5
+WINDOW_SIZE = 8
 STEP_SIZE = 2
 
 CORRELATION_THRESHOLD = 0.95
@@ -14,7 +14,7 @@ MOVING_AVERAGE_WINDOW_SIZE = 3
 
 # ================= FEATURE EXTRACTION =================
 
-FEATURES_PER_SUBCARRIER = 6
+FEATURES_PER_SUBCARRIER = 11
 
 FEATURE_NAMES = [
     "mean",
@@ -23,12 +23,17 @@ FEATURE_NAMES = [
     "max",
     "peak_to_peak",
     "energy",
+    "mean_abs_diff",
+    "max_abs_diff",
+    "diff_energy",
+    "std_diff",
+    "slope",
 ]
 
 
 # ================= FEATURE SELECTION =================
 
-TOP_K_FEATURES = 70
+TOP_K_FEATURES = 126
 FISHER_MINIMUM_SCORE = 0.0
 
 

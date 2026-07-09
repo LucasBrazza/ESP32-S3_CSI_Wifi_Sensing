@@ -24,6 +24,7 @@ Fixed classifier configuration:
 import csv
 import random
 from collections import Counter
+import argparse
 
 from Tools.common.config import (
     MODEL,
@@ -671,7 +672,7 @@ def save_experiment_notes(
     train_group_count = count_groups_by_label(train_groups)
     test_group_count = count_groups_by_label(test_groups)
 
-    labels = get_labels(feature_dataset)
+    labels = CLASS_ORDER[:]
 
     lines = []
 
@@ -833,7 +834,7 @@ def run_experiment():
     if not feature_dataset:
         raise ValueError("Feature dataset is empty.")
 
-    labels = get_labels(feature_dataset)
+    labels = CLASS_ORDER[:]
 
     print("Splitting dataset by file before feature selection...")
 
@@ -1041,17 +1042,69 @@ def run_experiment():
     print(paths["run_dir"])
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Top-K tuning with file-based holdout."
+    )
+
+    parser.add_argument(
+        "--experiment-id",
+        default=EXPERIMENT_ID,
+        help="Experiment identifier used in the experiment index.",
+    )
+
+    parser.add_argument(
+        "--experiment-folder",
+        default=EXPERIMENT_FOLDER_NAME,
+        help="Folder name used to save experiment outputs.",
+    )
+
+    parser.add_argument(
+        "--top-k-values",
+        default=",".join(str(value) for value in TOP_K_VALUES),
+        help="Comma-separated list of top_k values to evaluate.",
+    )
+
+    return parser.parse_args()
+
+
+def parse_top_k_values(raw_values):
+    values = []
+
+    for raw_value in raw_values.split(","):
+        raw_value = raw_value.strip()
+
+        if not raw_value:
+            continue
+
+        values.append(int(raw_value))
+
+    return values
+
+
 def main():
+    global EXPERIMENT_ID
+    global EXPERIMENT_FOLDER_NAME
+    global TOP_K_VALUES
+
+    args = parse_args()
+
+    EXPERIMENT_ID = args.experiment_id
+    EXPERIMENT_FOLDER_NAME = args.experiment_folder
+    TOP_K_VALUES = parse_top_k_values(args.top_k_values)
+
     print()
     print("Top-K Feature Tuning with File-Based Holdout")
     print("=" * 70)
+    print("Experiment ID:", EXPERIMENT_ID)
+    print("Experiment folder:", EXPERIMENT_FOLDER_NAME)
     print("Model:", MODEL)
     print("Max tree depth:", MAX_TREE_DEPTH)
     print("Min samples split:", MIN_SAMPLES_SPLIT)
     print("Tested top_k values:", TOP_K_VALUES)
     print()
-    run_experiment()
 
+    run_experiment()
 
 if __name__ == "__main__":
     main()

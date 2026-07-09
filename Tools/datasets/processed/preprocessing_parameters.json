@@ -1,5 +1,5 @@
 {
-    "window_size": 5,
+    "window_size": 8,
     "step_size": 2,
     "correlation_threshold": 0.95,
     "means": [
@@ -414,6 +414,6 @@
         188
     ],
     "num_selected_subcarriers": 21,
-    "features_per_sample": 126,
-    "num_samples": 790
+    "features_per_sample": 231,
+    "num_samples": 417
 }

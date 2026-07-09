@@ -1,0 +1,4 @@
+true_label/predicted_label,empty,static_presence,movement
+empty,1,2,4
+static_presence,0,10,3
+movement,2,1,10

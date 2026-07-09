@@ -1,0 +1,33 @@
+BEST TOP-K CONFIGURATION - FILE-BASED HOLDOUT
+======================================================================
+
+Experiment: 014_w10_s5 - 014_window10_step5_temporal_features
+
+Selection criterion:
+Highest macro F1-score, then highest accuracy, then smaller top_k.
+
+Best configuration:
+- top_k: 150
+- max_depth: 6
+- min_samples_split: 5
+
+Validation metrics:
+- accuracy: 0.636364
+- macro_f1: 0.545299
+- weighted_f1: 0.608081
+
+Per-class F1-score:
+- empty: 0.200000
+- static_presence: 0.769231
+- movement: 0.666667
+
+Per-class recall:
+- empty: 0.142857
+- static_presence: 0.769231
+- movement: 0.769231
+
+Tree complexity:
+- total nodes: 33
+- decision nodes: 16
+- leaf nodes: 17
+- actual max depth: 6

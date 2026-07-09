@@ -1,0 +1,4 @@
+label,precision,recall,f1_score,support
+empty,1.0,1.0,1.0,8
+static_presence,0.0,0.0,0.0,0
+movement,0.0,0.0,0.0,0

@@ -1,0 +1,60 @@
+Experiment 012 - Train-only Top-K tuning with file-based holdout
+
+Description:
+Controlled experiment varying the number of Fisher Score selected features while keeping the tuned decision tree parameters fixed.
+
+Motivation:
+Previous top_k experiments computed the Fisher Score ranking before the train/test split. This experiment corrects the methodology by splitting the dataset by acquisition file first, computing the Fisher Score ranking only on the training set, and then applying the selected feature indices to both training and test sets.
+
+Validation:
+- File-based stratified holdout 80/20
+- Random seed: 42
+
+Feature selection:
+- Fisher Score ranking computed only on training data
+- Test data is not used to rank or select features
+- Selected feature indices are applied to both train and test sets
+
+Fixed classifier parameters:
+- Max tree depth: 6
+- Min samples split: 5
+
+Tested top_k values:
+[30, 50, 70, 100, 126, 150, 180, 200, 231]
+
+Dataset:
+- Total samples/windows: 641
+- Train samples/windows: 517
+- Test samples/windows: 124
+- Total files/groups: 224
+- Train files/groups: 179
+- Test files/groups: 45
+- Original features per sample: 231
+- Selected features in best result: 180
+
+Class distribution by samples/windows:
+Class                    Total     Train      Test
+empty                      169       142        27
+static_presence            234       186        48
+movement                   238       189        49
+
+Class distribution by files/groups:
+Class                    Total     Train      Test
+empty                       49        39        10
+static_presence             87        70        17
+movement                    88        70        18
+
+Best result:
+- top_k: 180
+- accuracy: 0.661290
+- macro F1-score: 0.652514
+- weighted F1-score: 0.653286
+- empty F1-score: 0.642857
+- static_presence F1-score: 0.769231
+- movement F1-score: 0.545455
+
+Main observation:
+This experiment provides a cleaner estimate of top_k performance, because the feature ranking is learned only from the training data. The result should be compared with experiments 006 and 011, which used feature selections obtained before this methodological correction.
+
+Next step:
+If the result remains close to the previous best configuration, the pipeline can proceed to temporal feature engineering. If performance drops significantly, previous results should be treated as optimistic.
