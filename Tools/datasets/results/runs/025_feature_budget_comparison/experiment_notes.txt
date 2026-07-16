@@ -1,0 +1,55 @@
+Experiment 025 - Feature-budget comparison
+
+Objective:
+Find the smallest Fisher Score Top-K feature budget that preserves multiclass performance, especially movement F1, for compact Gradient Boosting and XGBoost models.
+
+Dataset:
+- Samples/windows: 417
+- Features per sample: 231
+
+Validation:
+- File-based stratified holdout: 80/20
+- Seeds: [7, 13, 21, 42, 84, 126, 168, 210, 336, 512]
+- Top-K values: [30, 50, 70, 100, 126, 160, 231]
+- Fisher Score ranking computed using training data only for every seed
+- Both models receive the same split and feature indices within each seed
+
+Models:
+- Gradient Boosting: {'family': 'gradient_boosting', 'display_name': 'Gradient Boosting', 'n_estimators': 20, 'learning_rate': 0.1, 'max_depth': 3}
+- XGBoost: {'family': 'xgboost', 'display_name': 'XGBoost', 'n_estimators': 20, 'learning_rate': 0.1, 'max_depth': 3}
+
+Highest mean Macro F1 configuration:
+- classifier: xgboost_top231
+- top_k: 231
+- accuracy mean: 0.693243
+- macro F1 mean: 0.691236
+- macro F1 std: 0.084236
+- weighted F1 mean: 0.692798
+- actual trees mean: 60.00
+- actual nodes mean: 846.00
+- used features mean: 98.80
+
+Compact-selection tolerances:
+- Maximum Macro F1 drop: 0.020
+- Maximum movement F1 drop: 0.020
+
+Compact recommendations by family:
+- gradient_boosting:
+  - top_k: 126
+  - macro F1 mean: 0.683087
+  - movement F1 mean: 0.656811
+  - Macro F1 drop from family best: 0.005079
+  - movement F1 drop from highest-Macro-F1 reference: -0.010525
+  - nodes mean: 895.60
+  - used features mean: 93.60
+- xgboost:
+  - top_k: 160
+  - macro F1 mean: 0.674988
+  - movement F1 mean: 0.646428
+  - Macro F1 drop from family best: 0.016249
+  - movement F1 drop from highest-Macro-F1 reference: -0.012195
+  - nodes mean: 853.80
+  - used features mean: 86.20
+
+Interpretation rule:
+The highest mean Macro F1 is not automatically the final embedded model. Prefer the smallest Top-K that stays within the stated Macro F1 and movement F1 tolerances, then inspect stability, confusion patterns, node count and used features.
