@@ -1,0 +1,46 @@
+Experiment 024 - Professor suggestion classifier comparison
+
+Objective:
+Compare Logistic Regression and compact XGBoost alternatives against the current Gradient Boosting candidate.
+
+Dataset:
+- Samples/windows: 417
+- Features per sample: 231
+
+Validation:
+- File-based stratified holdout: 80/20
+- Seeds: [7, 13, 21, 42, 84, 126, 168, 210, 336, 512]
+- Fisher Score ranking computed using training data only for every seed
+- The same split is used by every classifier within each seed
+
+Metrics:
+- Accuracy
+- Macro F1 and Weighted F1
+- Per-class precision, recall and F1
+- Multiclass ROC-AUC One-vs-Rest, macro and weighted
+- Multiclass Average Precision, macro and weighted
+- Per-class ROC-AUC and Average Precision
+- Aggregated confusion matrices
+- Training and inference time
+
+Compared models:
+- gradient_boosting_depth3_20: {'name': 'gradient_boosting_depth3_20', 'family': 'gradient_boosting', 'top_k': 231, 'n_estimators': 20, 'learning_rate': 0.1, 'max_depth': 3, 'estimated_model_units': 20}
+- logistic_regression_c0_1: {'name': 'logistic_regression_c0_1', 'family': 'logistic_regression', 'top_k': 231, 'c': 0.1, 'class_weight': None, 'estimated_model_units': 1}
+- logistic_regression_c1: {'name': 'logistic_regression_c1', 'family': 'logistic_regression', 'top_k': 231, 'c': 1.0, 'class_weight': None, 'estimated_model_units': 1}
+- logistic_regression_c10: {'name': 'logistic_regression_c10', 'family': 'logistic_regression', 'top_k': 231, 'c': 10.0, 'class_weight': None, 'estimated_model_units': 1}
+- logistic_regression_c1_balanced: {'name': 'logistic_regression_c1_balanced', 'family': 'logistic_regression', 'top_k': 231, 'c': 1.0, 'class_weight': 'balanced', 'estimated_model_units': 1}
+- xgboost_depth2_10: {'name': 'xgboost_depth2_10', 'family': 'xgboost', 'top_k': 231, 'n_estimators': 10, 'learning_rate': 0.1, 'max_depth': 2, 'estimated_model_units': 10}
+- xgboost_depth2_20: {'name': 'xgboost_depth2_20', 'family': 'xgboost', 'top_k': 231, 'n_estimators': 20, 'learning_rate': 0.1, 'max_depth': 2, 'estimated_model_units': 20}
+- xgboost_depth3_20: {'name': 'xgboost_depth3_20', 'family': 'xgboost', 'top_k': 231, 'n_estimators': 20, 'learning_rate': 0.1, 'max_depth': 3, 'estimated_model_units': 20}
+
+Best result by mean Macro F1:
+- classifier: xgboost_depth3_20
+- accuracy mean: 0.693243
+- macro F1 mean: 0.691236
+- macro F1 std: 0.084236
+- weighted F1 mean: 0.692798
+- ROC-AUC OvR macro mean: 0.845182
+- Average Precision macro mean: 0.749575
+
+Selection rule:
+Macro F1 remains the main ranking metric. Weighted F1, ROC-AUC, Average Precision, confusion patterns, stability and embedded cost are used as complementary evidence.
