@@ -1,0 +1,60 @@
+{
+  "schema_version": 4,
+  "selection_source": "Tools\\datasets\\results\\realtime_simulation_predictions.csv",
+  "selection_metrics": {
+    "candidate_id": "candidate_004",
+    "smoothing": "none",
+    "normal_confirmations": 1,
+    "direct_confirmations": 1,
+    "normal_threshold": 0.0,
+    "direct_threshold": 0.6,
+    "valid_windows": 221,
+    "raw_accuracy": 0.8914027149321267,
+    "stable_accuracy": 0.9140271493212669,
+    "accuracy_delta": 0.02262443438914027,
+    "false_empty_windows": 0,
+    "false_presence_windows": 11,
+    "accepted_transitions": 15,
+    "inferred_transitions": 1,
+    "final_stable_state": "empty"
+  },
+  "state_machine": {
+    "initial_state": "empty",
+    "startup_discard_windows": 0,
+    "probability_smoothing": {
+      "weights_oldest_to_newest": [
+        1.0
+      ]
+    },
+    "normal_transitions": {
+      "empty_to_movement": {
+        "confirmations": 1,
+        "min_target_probability": 0.0
+      },
+      "movement_to_static_presence": {
+        "confirmations": 1,
+        "min_target_probability": 0.0
+      },
+      "movement_to_empty": {
+        "confirmations": 1,
+        "min_target_probability": 0.0
+      },
+      "static_presence_to_movement": {
+        "confirmations": 1,
+        "min_target_probability": 0.0
+      }
+    },
+    "direct_transitions": {
+      "empty_to_static_presence": {
+        "enabled": true,
+        "confirmations": 1,
+        "min_target_probability": 0.6
+      },
+      "static_presence_to_empty": {
+        "enabled": true,
+        "confirmations": 1,
+        "min_target_probability": 0.6
+      }
+    }
+  }
+}

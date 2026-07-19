@@ -1,0 +1,42 @@
+{
+  "schema_version": 4,
+  "state_machine": {
+    "initial_state": "empty",
+    "startup_discard_windows": 0,
+    "probability_smoothing": {
+      "weights_oldest_to_newest": [
+        1.0
+      ]
+    },
+    "normal_transitions": {
+      "empty_to_movement": {
+        "confirmations": 1,
+        "min_target_probability": 0.5
+      },
+      "movement_to_static_presence": {
+        "confirmations": 1,
+        "min_target_probability": 0.5
+      },
+      "movement_to_empty": {
+        "confirmations": 1,
+        "min_target_probability": 0.5
+      },
+      "static_presence_to_movement": {
+        "confirmations": 1,
+        "min_target_probability": 0.5
+      }
+    },
+    "direct_transitions": {
+      "empty_to_static_presence": {
+        "enabled": true,
+        "confirmations": 2,
+        "min_target_probability": 0.55
+      },
+      "static_presence_to_empty": {
+        "enabled": true,
+        "confirmations": 2,
+        "min_target_probability": 0.55
+      }
+    }
+  }
+}
