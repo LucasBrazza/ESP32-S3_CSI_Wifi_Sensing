@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import queue
+import re
+import subprocess
 import sys
 import threading
 import time
@@ -11,7 +13,12 @@ from pathlib import Path
 import pyqtgraph as pg
 import serial
 import serial.tools.list_ports
-from PyQt5 import QtCore, QtWidgets
+from PyQt5 import QtCore, QtGui, QtWidgets
+
+try:
+    import winsound
+except ImportError:  # pragma: no cover - Windows is the target platform.
+    winsound = None
 
 
 # ================= PATHS =================
@@ -36,8 +43,28 @@ EVENT_QUEUE_MAX_SIZE = 5000
 SERIAL_READ_CHUNK_SIZE = 4096
 COLLECTION_FINALIZE_GRACE_SECONDS = 0.75
 COLLECTION_FINALIZE_MAX_SECONDS = 3.0
+PROGRAMMED_NEXT_DELAY_MS = 1500
 
 SUBCARRIERS_TO_PLOT = [0, 5, 10, 15, 20, 25]
+
+PROGRAMMED_CLASS_ORDERS = (
+    ("empty", "static_presence", "movement"),
+    ("movement", "empty", "static_presence"),
+    ("static_presence", "movement", "empty"),
+)
+
+CLASS_SPOKEN_NAMES = {
+    "empty": "Empty",
+    "static_presence": "Static",
+    "movement": "Movement",
+}
+
+# Used only as a fallback if Windows TTS is unavailable.
+CLASS_BEEP_COUNTS = {
+    "empty": 1,
+    "static_presence": 2,
+    "movement": 3,
+}
 
 DATASET_DIR = TOOLS_DIR / "datasets"
 RAW_BIN_DIR = DATASET_DIR / "raw_bin"
@@ -207,7 +234,21 @@ class CSIViewer(QtWidgets.QMainWindow):
         self.collection_packets: list[dict] = []
         self.collection_packet_index = 0
 
+        self.active_collection_label = "empty"
+        self.active_collection_session = "session_01"
+        self.active_collection_quadrant = "quad1"
+        self.active_collection_programmed = False
+        self.active_programmed_item_number: int | None = None
+        self.active_output_dir = DATASET_DIR
+
+        self.programmed_active = False
+        self.programmed_pause_requested = False
+        self.programmed_cancel_requested = False
+        self.programmed_plan: list[dict[str, int | str]] = []
+        self.programmed_index = 0
+
         self._build_ui()
+        self._configure_window_shortcuts()
 
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.process_events_and_update_plots)
@@ -218,8 +259,16 @@ class CSIViewer(QtWidgets.QMainWindow):
     def _build_ui(self) -> None:
         central = QtWidgets.QWidget()
         main_layout = QtWidgets.QVBoxLayout(central)
+        main_layout.setContentsMargins(6, 6, 6, 6)
+        main_layout.setSpacing(6)
 
-        controls = QtWidgets.QHBoxLayout()
+        # Keep the serial controls and the long diagnostics text on separate
+        # rows so the interface adapts to smaller screens and Windows scaling.
+        controls_widget = QtWidgets.QWidget()
+        controls = QtWidgets.QGridLayout(controls_widget)
+        controls.setContentsMargins(0, 0, 0, 0)
+        controls.setHorizontalSpacing(6)
+        controls.setVerticalSpacing(3)
 
         self.port_combo = QtWidgets.QComboBox()
         self.refresh_ports()
@@ -234,27 +283,58 @@ class CSIViewer(QtWidgets.QMainWindow):
         self.start_serial_button.clicked.connect(self.toggle_serial)
 
         self.status_label = QtWidgets.QLabel("Disconnected")
+        self.status_label.setMinimumWidth(0)
+
         self.stats_label = QtWidgets.QLabel(
             "Packets: 0 | Rate: 0.0 Hz | Queue: 0"
         )
+        self.stats_label.setWordWrap(True)
+        self.stats_label.setMinimumWidth(0)
+        self.stats_label.setSizePolicy(
+            QtWidgets.QSizePolicy.Expanding,
+            QtWidgets.QSizePolicy.Preferred,
+        )
 
-        controls.addWidget(QtWidgets.QLabel("Port"))
-        controls.addWidget(self.port_combo)
-        controls.addWidget(refresh_button)
-        controls.addWidget(QtWidgets.QLabel("Baud"))
-        controls.addWidget(self.baud_input)
-        controls.addWidget(self.start_serial_button)
-        controls.addWidget(self.status_label)
-        controls.addStretch()
-        controls.addWidget(self.stats_label)
+        controls.addWidget(QtWidgets.QLabel("Port"), 0, 0)
+        controls.addWidget(self.port_combo, 0, 1)
+        controls.addWidget(refresh_button, 0, 2)
+        controls.addWidget(QtWidgets.QLabel("Baud"), 0, 3)
+        controls.addWidget(self.baud_input, 0, 4)
+        controls.addWidget(self.start_serial_button, 0, 5)
+        controls.addWidget(self.status_label, 0, 6)
+        controls.setColumnStretch(7, 1)
+        controls.addWidget(self.stats_label, 1, 0, 1, 8)
 
-        main_layout.addLayout(controls)
+        main_layout.addWidget(controls_widget)
 
-        grid = QtWidgets.QGridLayout()
-        main_layout.addLayout(grid)
+        # The left configuration area is scrollable. This prevents controls
+        # from extending below the screen on notebooks or with DPI scaling.
+        left_panel = QtWidgets.QWidget()
+        left_layout = QtWidgets.QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(6)
 
         self.collection_panel = self._create_collection_panel()
-        grid.addWidget(self.collection_panel, 0, 0, 2, 1)
+        self.programmed_panel = self._create_programmed_panel()
+
+        left_layout.addWidget(self.collection_panel)
+        left_layout.addWidget(self.programmed_panel)
+        left_layout.addStretch()
+
+        left_scroll = QtWidgets.QScrollArea()
+        left_scroll.setWidgetResizable(True)
+        left_scroll.setHorizontalScrollBarPolicy(
+            QtCore.Qt.ScrollBarAlwaysOff
+        )
+        left_scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
+        left_scroll.setWidget(left_panel)
+        left_scroll.setMinimumWidth(320)
+        left_scroll.setMaximumWidth(440)
+
+        plots_panel = QtWidgets.QWidget()
+        plots_layout = QtWidgets.QVBoxLayout(plots_panel)
+        plots_layout.setContentsMargins(0, 0, 0, 0)
+        plots_layout.setSpacing(6)
 
         self.waveform_widget = pg.PlotWidget(
             title="CSI Waveform - Multiple Subcarriers"
@@ -283,8 +363,6 @@ class CSIViewer(QtWidgets.QMainWindow):
             )
             self.waveform_curves[subcarrier] = curve
 
-        grid.addWidget(self.waveform_widget, 0, 1)
-
         self.rssi_widget = pg.PlotWidget(title="RSSI Over Time")
         self.rssi_curve = self.rssi_widget.plot(
             pen=pg.mkPen(color=(255, 255, 255), width=1)
@@ -292,7 +370,18 @@ class CSIViewer(QtWidgets.QMainWindow):
         self.rssi_widget.setLabel("left", "RSSI dBm")
         self.rssi_widget.setLabel("bottom", "Packets")
 
-        grid.addWidget(self.rssi_widget, 1, 1)
+        plots_layout.addWidget(self.waveform_widget, 2)
+        plots_layout.addWidget(self.rssi_widget, 1)
+
+        splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
+        splitter.setChildrenCollapsible(False)
+        splitter.addWidget(left_scroll)
+        splitter.addWidget(plots_panel)
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        splitter.setSizes([360, 1040])
+
+        main_layout.addWidget(splitter, 1)
         self.setCentralWidget(central)
 
     def _create_collection_panel(self) -> QtWidgets.QGroupBox:
@@ -302,6 +391,13 @@ class CSIViewer(QtWidgets.QMainWindow):
         self.label_combo = QtWidgets.QComboBox()
         self.label_combo.addItems(
             ["empty", "static_presence", "movement"]
+        )
+
+        self.session_input = QtWidgets.QLineEdit("session_01")
+
+        self.quadrant_combo = QtWidgets.QComboBox()
+        self.quadrant_combo.addItems(
+            ["quad1", "quad2", "quad3", "quad4", "quad5"]
         )
 
         self.offset_input = QtWidgets.QDoubleSpinBox()
@@ -316,12 +412,12 @@ class CSIViewer(QtWidgets.QMainWindow):
 
         self.output_dir_input = QtWidgets.QLineEdit(str(DATASET_DIR))
 
-        browse_button = QtWidgets.QPushButton("Browse")
-        browse_button.clicked.connect(self.select_output_dir)
+        self.browse_button = QtWidgets.QPushButton("Browse")
+        self.browse_button.clicked.connect(self.select_output_dir)
 
         output_layout = QtWidgets.QHBoxLayout()
         output_layout.addWidget(self.output_dir_input)
-        output_layout.addWidget(browse_button)
+        output_layout.addWidget(self.browse_button)
 
         self.start_collection_button = QtWidgets.QPushButton(
             "Start Collection"
@@ -338,6 +434,8 @@ class CSIViewer(QtWidgets.QMainWindow):
         self.collection_progress.setValue(0)
 
         form = QtWidgets.QFormLayout()
+        form.addRow("Session", self.session_input)
+        form.addRow("Quadrant", self.quadrant_combo)
         form.addRow("Label", self.label_combo)
         form.addRow("Start offset", self.offset_input)
         form.addRow("Duration", self.duration_input)
@@ -352,7 +450,7 @@ class CSIViewer(QtWidgets.QMainWindow):
 
         info = QtWidgets.QLabel(
             "Saved files:\n"
-            "datasets/raw_bin/label_timestamp.bin\n\n"
+            "raw_bin/session/quadrant/label/*.bin\n\n"
             "Binary serial protocol:\n"
             "CSI2 at 921600 baud\n\n"
             "Labels:\n"
@@ -362,6 +460,111 @@ class CSIViewer(QtWidgets.QMainWindow):
         layout.addWidget(info)
 
         return group
+
+    def _create_programmed_panel(self) -> QtWidgets.QGroupBox:
+        group = QtWidgets.QGroupBox("Programmed Collection")
+        layout = QtWidgets.QVBoxLayout(group)
+
+        self.program_cycles_input = QtWidgets.QSpinBox()
+        self.program_cycles_input.setRange(1, 100)
+        self.program_cycles_input.setValue(10)
+
+        self.program_prepare_input = QtWidgets.QDoubleSpinBox()
+        self.program_prepare_input.setRange(0, 300)
+        self.program_prepare_input.setValue(8)
+        self.program_prepare_input.setSuffix(" s")
+
+        self.program_duration_input = QtWidgets.QDoubleSpinBox()
+        self.program_duration_input.setRange(1, 3600)
+        self.program_duration_input.setValue(10)
+        self.program_duration_input.setSuffix(" s")
+
+        form = QtWidgets.QFormLayout()
+        form.addRow("Cycles", self.program_cycles_input)
+        form.addRow("Preparation", self.program_prepare_input)
+        form.addRow("Duration", self.program_duration_input)
+
+        layout.addLayout(form)
+
+        order_label = QtWidgets.QLabel(
+            "One programmed run uses the selected quadrant.\n"
+            "Change the quadrant only after the protocol finishes.\n\n"
+            "Order: E-S-M → M-E-S → S-M-E\n"
+            "Voice = next class\n"
+            "Long beep = recording started\n"
+            "Two high beeps = recording ended\n"
+            "F11 = fullscreen | Esc = leave fullscreen"
+        )
+        order_label.setWordWrap(True)
+        layout.addWidget(order_label)
+
+        self.start_program_button = QtWidgets.QPushButton(
+            "Start Programmed Collection"
+        )
+        self.start_program_button.clicked.connect(
+            self.start_programmed_collection
+        )
+
+        self.pause_program_button = QtWidgets.QPushButton(
+            "Pause after current"
+        )
+        self.pause_program_button.clicked.connect(
+            self.toggle_programmed_pause
+        )
+        self.pause_program_button.setEnabled(False)
+
+        self.cancel_program_button = QtWidgets.QPushButton(
+            "Cancel after current"
+        )
+        self.cancel_program_button.clicked.connect(
+            self.cancel_programmed_collection
+        )
+        self.cancel_program_button.setEnabled(False)
+
+        self.program_progress = QtWidgets.QProgressBar()
+        self.program_progress.setValue(0)
+
+        self.program_status_label = QtWidgets.QLabel(
+            "Programmed collection idle"
+        )
+        self.program_status_label.setWordWrap(True)
+
+        layout.addWidget(self.start_program_button)
+        layout.addWidget(self.pause_program_button)
+        layout.addWidget(self.cancel_program_button)
+        layout.addWidget(self.program_progress)
+        layout.addWidget(self.program_status_label)
+
+        return group
+
+    # ================= WINDOW CONTROL =================
+
+    def _configure_window_shortcuts(self) -> None:
+        self.fullscreen_shortcut = QtWidgets.QShortcut(
+            QtGui.QKeySequence("F11"),
+            self,
+        )
+        self.fullscreen_shortcut.activated.connect(
+            self.toggle_fullscreen
+        )
+
+        self.leave_fullscreen_shortcut = QtWidgets.QShortcut(
+            QtGui.QKeySequence("Escape"),
+            self,
+        )
+        self.leave_fullscreen_shortcut.activated.connect(
+            self.leave_fullscreen
+        )
+
+    def toggle_fullscreen(self) -> None:
+        if self.isFullScreen():
+            self.showMaximized()
+        else:
+            self.showFullScreen()
+
+    def leave_fullscreen(self) -> None:
+        if self.isFullScreen():
+            self.showMaximized()
 
     # ================= SERIAL CONTROL =================
 
@@ -410,6 +613,9 @@ class CSIViewer(QtWidgets.QMainWindow):
         self.status_label.setText(f"Connected: {port}")
 
     def stop_serial(self) -> None:
+        if self.programmed_active:
+            self.programmed_cancel_requested = True
+
         if self.collection_session_active:
             self.stop_collection()
 
@@ -434,19 +640,53 @@ class CSIViewer(QtWidgets.QMainWindow):
             self.output_dir_input.setText(folder)
 
     def start_collection(self) -> None:
+        if self.programmed_active:
+            self.collection_status_label.setText(
+                "Finish or cancel the programmed protocol first."
+            )
+            return
+
+        self._begin_collection(
+            label=self.label_combo.currentText(),
+            offset=float(self.offset_input.value()),
+            duration=float(self.duration_input.value()),
+            programmed=False,
+        )
+
+    def _begin_collection(
+        self,
+        label: str,
+        offset: float,
+        duration: float,
+        programmed: bool,
+        programmed_item_number: int | None = None,
+    ) -> None:
         if not self.running:
             self.collection_status_label.setText(
                 "Start serial before collecting."
             )
             return
 
+        if self.collection_session_active:
+            return
+
         self.collection_packets = []
         self.collection_packet_index = 0
 
-        offset = float(self.offset_input.value())
-        duration = float(self.duration_input.value())
-        now = time.time()
+        self.active_collection_label = label
+        self.active_collection_session = self._sanitize_path_component(
+            self.session_input.text(),
+            fallback="session_01",
+        )
+        self.active_collection_quadrant = self._sanitize_path_component(
+            self.quadrant_combo.currentText(),
+            fallback="quad1",
+        )
+        self.active_collection_programmed = programmed
+        self.active_programmed_item_number = programmed_item_number
+        self.active_output_dir = Path(self.output_dir_input.text())
 
+        now = time.time()
         self.collection_start_time = now + offset
         self.collection_end_time = self.collection_start_time + duration
         self.collection_finalize_after = None
@@ -457,18 +697,23 @@ class CSIViewer(QtWidgets.QMainWindow):
         self.waiting_offset = offset > 0
         self.collecting = offset == 0
 
+        self.label_combo.setCurrentText(label)
         self.collection_progress.setValue(0)
         self.start_collection_button.setEnabled(False)
-        self.stop_collection_button.setEnabled(True)
+        self.stop_collection_button.setEnabled(not programmed)
+
+        if programmed:
+            self._speak_class_label(label)
 
         if self.waiting_offset:
             self.collection_status_label.setText(
-                f"Waiting offset: {offset:.1f} s"
+                f"Preparing {label}: {offset:.1f} s"
             )
         else:
             self.collection_status_label.setText(
-                f"Collecting: {self.label_combo.currentText()}"
+                f"Collecting: {label}"
             )
+            self._play_recording_start_beep()
 
     def stop_collection(self) -> None:
         if not self.collection_session_active:
@@ -496,34 +741,60 @@ class CSIViewer(QtWidgets.QMainWindow):
             now + COLLECTION_FINALIZE_MAX_SECONDS
         )
 
+        if (
+            self.collection_start_time is not None
+            and now >= self.collection_start_time
+        ):
+            self._play_recording_end_beep()
+
         self.collection_status_label.setText(
             "Finalizing queued packets..."
         )
 
     def _finish_collection(self) -> None:
+        was_programmed = self.active_collection_programmed
+
         self.collection_session_active = False
         self.collection_finalizing = False
         self.collecting = False
         self.waiting_offset = False
 
-        self.save_collection()
+        saved_path = self.save_collection()
 
-        self.start_collection_button.setEnabled(True)
+        self.start_collection_button.setEnabled(not self.programmed_active)
         self.stop_collection_button.setEnabled(False)
         self.collection_progress.setValue(100)
 
-    def save_collection(self) -> None:
+        if was_programmed and self.programmed_active:
+            self._complete_programmed_item(saved_path)
+
+    def save_collection(self) -> Path | None:
         if not self.collection_packets:
             self.collection_status_label.setText("No data collected.")
-            return
+            return None
 
-        base_output_dir = Path(self.output_dir_input.text())
-        raw_bin_dir = base_output_dir / "raw_bin"
+        raw_bin_dir = (
+            self.active_output_dir
+            / "raw_bin"
+            / self.active_collection_session
+            / self.active_collection_quadrant
+            / self.active_collection_label
+        )
         raw_bin_dir.mkdir(parents=True, exist_ok=True)
 
-        label = self.label_combo.currentText()
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        bin_file_path = raw_bin_dir / f"{label}_{timestamp}.bin"
+        item_suffix = ""
+
+        if self.active_programmed_item_number is not None:
+            item_suffix = f"_p{self.active_programmed_item_number:03d}"
+
+        file_name = (
+            f"{self.active_collection_label}_"
+            f"{self.active_collection_session}_"
+            f"{self.active_collection_quadrant}"
+            f"{item_suffix}_{timestamp}.bin"
+        )
+        bin_file_path = raw_bin_dir / file_name
 
         write_packets(bin_file_path, self.collection_packets)
 
@@ -532,6 +803,318 @@ class CSIViewer(QtWidgets.QMainWindow):
             f"Saved {len(self.collection_packets)} packets:\n"
             f"{bin_file_path.name}"
         )
+
+        return bin_file_path
+
+    @staticmethod
+    def _sanitize_path_component(value: str, fallback: str) -> str:
+        normalized = re.sub(r"[^A-Za-z0-9_-]+", "_", value.strip())
+        normalized = normalized.strip("_")
+        return normalized or fallback
+
+    # ================= PROGRAMMED COLLECTION =================
+
+    def start_programmed_collection(self) -> None:
+        if not self.running:
+            self.program_status_label.setText(
+                "Start serial before starting the protocol."
+            )
+            return
+
+        if self.collection_session_active or self.programmed_active:
+            return
+
+        cycles = int(self.program_cycles_input.value())
+        plan: list[dict[str, int | str]] = []
+
+        for cycle_index in range(cycles):
+            order = PROGRAMMED_CLASS_ORDERS[
+                cycle_index % len(PROGRAMMED_CLASS_ORDERS)
+            ]
+
+            for label in order:
+                plan.append(
+                    {
+                        "cycle": cycle_index + 1,
+                        "label": label,
+                    }
+                )
+
+        self.programmed_plan = plan
+        self.programmed_index = 0
+        self.programmed_active = True
+        self.programmed_pause_requested = False
+        self.programmed_cancel_requested = False
+
+        self.program_progress.setRange(0, len(plan))
+        self.program_progress.setValue(0)
+
+        self.start_program_button.setEnabled(False)
+        self.pause_program_button.setEnabled(True)
+        self.cancel_program_button.setEnabled(True)
+        self.pause_program_button.setText("Pause after current")
+
+        self.start_collection_button.setEnabled(False)
+        self.stop_collection_button.setEnabled(False)
+
+        self._set_program_configuration_enabled(False)
+        self._start_next_programmed_item()
+
+    def _start_next_programmed_item(self) -> None:
+        if not self.programmed_active:
+            return
+
+        if self.programmed_cancel_requested:
+            self._finish_programmed_collection(cancelled=True)
+            return
+
+        if self.programmed_pause_requested:
+            self.program_status_label.setText(
+                "Protocol paused. Press Resume to continue."
+            )
+            return
+
+        if self.programmed_index >= len(self.programmed_plan):
+            self._finish_programmed_collection(cancelled=False)
+            return
+
+        item = self.programmed_plan[self.programmed_index]
+        label = str(item["label"])
+        cycle = int(item["cycle"])
+        item_number = self.programmed_index + 1
+        total = len(self.programmed_plan)
+
+        session = self._sanitize_path_component(
+            self.session_input.text(),
+            fallback="session_01",
+        )
+        quadrant = self._sanitize_path_component(
+            self.quadrant_combo.currentText(),
+            fallback="quad1",
+        )
+
+        self.program_status_label.setText(
+            f"{session} | {quadrant} | "
+            f"Item {item_number}/{total} | Cycle {cycle} | "
+            f"Prepare for: {label}"
+        )
+
+        self._begin_collection(
+            label=label,
+            offset=float(self.program_prepare_input.value()),
+            duration=float(self.program_duration_input.value()),
+            programmed=True,
+            programmed_item_number=item_number,
+        )
+
+    def _complete_programmed_item(
+        self,
+        saved_path: Path | None,
+    ) -> None:
+        completed_item = self.programmed_index + 1
+        self.programmed_index += 1
+        self.program_progress.setValue(self.programmed_index)
+
+        if saved_path is None:
+            self.program_status_label.setText(
+                f"Item {completed_item} produced no packets. "
+                "Protocol stopped for verification."
+            )
+            self.programmed_pause_requested = True
+            self.pause_program_button.setText("Resume")
+            return
+
+        if self.programmed_cancel_requested:
+            self._finish_programmed_collection(cancelled=True)
+            return
+
+        if self.programmed_pause_requested:
+            self.program_status_label.setText(
+                f"Paused after item {completed_item}. "
+                "Press Resume to continue."
+            )
+            return
+
+        QtCore.QTimer.singleShot(
+            PROGRAMMED_NEXT_DELAY_MS,
+            self._start_next_programmed_item,
+        )
+
+    def toggle_programmed_pause(self) -> None:
+        if not self.programmed_active:
+            return
+
+        self.programmed_pause_requested = (
+            not self.programmed_pause_requested
+        )
+
+        if self.programmed_pause_requested:
+            self.pause_program_button.setText("Resume")
+
+            if self.collection_session_active:
+                self.program_status_label.setText(
+                    "Pause requested. The current collection will finish."
+                )
+            else:
+                self.program_status_label.setText(
+                    "Protocol paused. Press Resume to continue."
+                )
+        else:
+            self.pause_program_button.setText("Pause after current")
+            self.program_status_label.setText("Resuming protocol...")
+
+            if not self.collection_session_active:
+                QtCore.QTimer.singleShot(
+                    200,
+                    self._start_next_programmed_item,
+                )
+
+    def cancel_programmed_collection(self) -> None:
+        if not self.programmed_active:
+            return
+
+        self.programmed_cancel_requested = True
+        self.cancel_program_button.setEnabled(False)
+
+        if self.collection_session_active:
+            self.program_status_label.setText(
+                "Cancellation requested. "
+                "The current collection will finish and be saved."
+            )
+        else:
+            self._finish_programmed_collection(cancelled=True)
+
+    def _finish_programmed_collection(self, cancelled: bool) -> None:
+        completed = self.programmed_index
+        total = len(self.programmed_plan)
+
+        self.programmed_active = False
+        self.programmed_pause_requested = False
+        self.programmed_cancel_requested = False
+        self.programmed_plan = []
+
+        self.start_program_button.setEnabled(True)
+        self.pause_program_button.setEnabled(False)
+        self.cancel_program_button.setEnabled(False)
+        self.pause_program_button.setText("Pause after current")
+
+        self.start_collection_button.setEnabled(self.running)
+        self.stop_collection_button.setEnabled(False)
+        self._set_program_configuration_enabled(True)
+
+        if cancelled:
+            self.program_status_label.setText(
+                f"Protocol cancelled after {completed}/{total} collections."
+            )
+        else:
+            self.program_status_label.setText(
+                f"Protocol completed: {completed}/{total} collections."
+            )
+            self._play_program_complete_beep()
+
+    def _set_program_configuration_enabled(self, enabled: bool) -> None:
+        self.session_input.setEnabled(enabled)
+        self.quadrant_combo.setEnabled(enabled)
+        self.output_dir_input.setEnabled(enabled)
+        self.browse_button.setEnabled(enabled)
+        self.program_cycles_input.setEnabled(enabled)
+        self.program_prepare_input.setEnabled(enabled)
+        self.program_duration_input.setEnabled(enabled)
+
+    # ================= AUDIO CUES =================
+
+    def _speak_class_label(self, label: str) -> None:
+        spoken_text = CLASS_SPOKEN_NAMES.get(label, label)
+
+        def worker() -> None:
+            if sys.platform != "win32":
+                self._play_class_beep_fallback(label)
+                return
+
+            escaped_text = spoken_text.replace("'", "''")
+            powershell_script = (
+                "Add-Type -AssemblyName System.Speech; "
+                "$speaker = New-Object "
+                "System.Speech.Synthesis.SpeechSynthesizer; "
+                "$speaker.Rate = -1; "
+                "$speaker.Volume = 100; "
+                f"$speaker.Speak('{escaped_text}'); "
+                "$speaker.Dispose();"
+            )
+
+            try:
+                completed = subprocess.run(
+                    [
+                        "powershell.exe",
+                        "-NoProfile",
+                        "-NonInteractive",
+                        "-ExecutionPolicy",
+                        "Bypass",
+                        "-Command",
+                        powershell_script,
+                    ],
+                    check=False,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    creationflags=getattr(
+                        subprocess,
+                        "CREATE_NO_WINDOW",
+                        0,
+                    ),
+                )
+
+                if completed.returncode != 0:
+                    self._play_class_beep_fallback(label)
+
+            except (OSError, subprocess.SubprocessError):
+                self._play_class_beep_fallback(label)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _play_class_beep_fallback(self, label: str) -> None:
+        count = CLASS_BEEP_COUNTS.get(label, 1)
+        pattern = [(750, 180, 160)] * count
+        self._play_beep_pattern(pattern)
+
+    def _play_recording_start_beep(self) -> None:
+        self._play_beep_pattern([(1200, 650, 0)])
+
+    def _play_recording_end_beep(self) -> None:
+        self._play_beep_pattern(
+            [
+                (1500, 170, 140),
+                (1500, 170, 0),
+            ]
+        )
+
+    def _play_program_complete_beep(self) -> None:
+        self._play_beep_pattern(
+            [
+                (900, 180, 100),
+                (1100, 180, 100),
+                (1300, 300, 0),
+            ]
+        )
+
+    @staticmethod
+    def _play_beep_pattern(
+        pattern: list[tuple[int, int, int]],
+    ) -> None:
+        if winsound is None:
+            QtWidgets.QApplication.beep()
+            return
+
+        def worker() -> None:
+            for frequency, duration_ms, pause_ms in pattern:
+                try:
+                    winsound.Beep(frequency, duration_ms)
+                except RuntimeError:
+                    winsound.MessageBeep()
+
+                if pause_ms > 0:
+                    time.sleep(pause_ms / 1000.0)
+
+        threading.Thread(target=worker, daemon=True).start()
 
     # ================= PROCESSING =================
 
@@ -650,8 +1233,9 @@ class CSIViewer(QtWidgets.QMainWindow):
                 self.waiting_offset = False
                 self.collecting = True
                 self.collection_status_label.setText(
-                    f"Collecting: {self.label_combo.currentText()}"
+                    f"Collecting: {self.active_collection_label}"
                 )
+                self._play_recording_start_beep()
             else:
                 self.collection_status_label.setText(
                     f"Waiting offset: {remaining:.1f} s"
@@ -701,7 +1285,7 @@ class CSIViewer(QtWidgets.QMainWindow):
         self.collection_packet_index += 1
 
         packet = {
-            "label": self.label_combo.currentText(),
+            "label": self.active_collection_label,
             "pc_timestamp": float(event.get("pc_timestamp", time.time())),
             "capture_timestamp": float(
                 event.get("capture_timestamp", event.get("pc_timestamp", 0.0))
@@ -792,7 +1376,7 @@ def main() -> None:
 
     app = QtWidgets.QApplication(sys.argv)
     viewer = CSIViewer()
-    viewer.show()
+    viewer.showFullScreen()
 
     sys.exit(app.exec_())
 
