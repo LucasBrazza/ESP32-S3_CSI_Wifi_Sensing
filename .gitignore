@@ -50,6 +50,31 @@ Tools/datasets/raw_bin/session_*/
 Tools/datasets/raw_bin/
 Tools/datasets/realtime_tests/
 
+
+# Dataset v2 local binary artifacts
+Tools/datasets/processed/*.joblib
+
+# Realtime recordings
+Tools/datasets/realtime_runs/
+
+# Temporary Dataset v2 experiment outputs
+Tools/datasets/results/__dataset_v2_complete_suite/
+Tools/datasets/results/dataset_v2_complete_suite.zip
+Tools/datasets/results/dataset_v2_complete_suite_quick/
+Tools/datasets/results/dataset_v2_complete_suite_quick_300_before_xgboost_fix/
+Tools/datasets/results/dataset_v2_complete_suite_quick_no_xgboost_301_files/
+
+# Realtime development outputs
+Tools/datasets/results/realtime_simulation*.csv
+Tools/datasets/results/state_machine_demo*.csv
+Tools/datasets/results/state_machine_predictions*.csv
+Tools/datasets/results/state_machine_tuning_v4/
+
+# Local backups
+Tools/realtime/*_before_v*.py
+Tools/realtime/*_before_v*.json
+
+
 # Local GUI comparison files
 Tools/acquisition/gui/*.diff
 
