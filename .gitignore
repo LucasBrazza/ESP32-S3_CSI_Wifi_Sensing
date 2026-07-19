@@ -47,6 +47,7 @@ datasets/processed/
 
 Tools/datasets/archive/
 Tools/datasets/raw_bin/session_*/
+Tools/datasets/raw_bin/
 
 # Local GUI comparison files
 Tools/acquisition/gui/*.diff
