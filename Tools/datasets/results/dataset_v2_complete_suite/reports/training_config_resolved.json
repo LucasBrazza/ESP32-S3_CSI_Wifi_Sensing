@@ -1,0 +1,655 @@
+{
+  "schema_version": 1,
+  "dataset": {
+    "root": "Tools/datasets/raw_bin",
+    "labels": [
+      "empty",
+      "static_presence",
+      "movement"
+    ],
+    "minimum_packets_per_file": 200,
+    "expected_subcarriers": 128,
+    "require_session_and_quadrant": true
+  },
+  "preprocessing": {
+    "hampel_radius": 5,
+    "hampel_n_sigmas": 3.0,
+    "moving_average_window": 3,
+    "minimum_informative_std": 1e-06,
+    "correlation_threshold": 0.95,
+    "correlation_threshold_candidates": [
+      0.85,
+      0.9,
+      0.95,
+      0.975,
+      0.99
+    ],
+    "correlation_max_rows": 50000
+  },
+  "features": {
+    "names_per_subcarrier": [
+      "mean",
+      "std",
+      "min",
+      "max",
+      "peak_to_peak",
+      "energy",
+      "mean_abs_diff",
+      "max_abs_diff",
+      "diff_energy",
+      "std_diff",
+      "slope"
+    ],
+    "capacity_top_k_candidates": [
+      70,
+      100,
+      126,
+      160,
+      "all"
+    ],
+    "compact_top_k_candidates": [
+      70,
+      100,
+      126,
+      160,
+      "all"
+    ],
+    "top_k_candidates": [
+      30,
+      50,
+      70,
+      100,
+      126,
+      160,
+      "all"
+    ]
+  },
+  "validation": {
+    "test_size": 0.2,
+    "search_seeds": [
+      7,
+      13,
+      21
+    ],
+    "capacity_seeds": [
+      42
+    ],
+    "compact_search_seeds": [
+      42
+    ],
+    "evaluation_seeds": [
+      7,
+      13,
+      21,
+      42,
+      84,
+      126,
+      168,
+      210,
+      336,
+      512
+    ],
+    "stratify_by": [
+      "label",
+      "session",
+      "quadrant"
+    ],
+    "correlation_reference_window_seconds": {
+      "window": 1.0,
+      "step": 0.25
+    },
+    "window_step_candidates_seconds": [
+      {
+        "window": 0.25,
+        "step": 0.1
+      },
+      {
+        "window": 0.5,
+        "step": 0.1
+      },
+      {
+        "window": 0.5,
+        "step": 0.25
+      },
+      {
+        "window": 0.75,
+        "step": 0.25
+      },
+      {
+        "window": 1.0,
+        "step": 0.2
+      },
+      {
+        "window": 1.0,
+        "step": 0.5
+      },
+      {
+        "window": 1.5,
+        "step": 0.25
+      },
+      {
+        "window": 2.0,
+        "step": 0.5
+      }
+    ],
+    "run_session_holdout": true,
+    "run_quadrant_holdout": true,
+    "run_binary_diagnostics": true,
+    "run_hierarchical_comparison": true
+  },
+  "models": {
+    "reference_model": {
+      "name": "gradient_boosting_reference",
+      "family": "gradient_boosting",
+      "top_k": 126,
+      "parameters": {
+        "n_estimators": 20,
+        "learning_rate": 0.1,
+        "max_depth": 3,
+        "subsample": 1.0
+      }
+    },
+    "decision_tree_candidates": [
+      {
+        "max_depth": 4,
+        "min_samples_split": 2,
+        "class_weight": "balanced"
+      },
+      {
+        "max_depth": 6,
+        "min_samples_split": 5,
+        "class_weight": "balanced"
+      },
+      {
+        "max_depth": 8,
+        "min_samples_split": 5,
+        "class_weight": "balanced"
+      },
+      {
+        "max_depth": 10,
+        "min_samples_split": 10,
+        "class_weight": "balanced"
+      },
+      {
+        "max_depth": 12,
+        "min_samples_split": 5,
+        "class_weight": "balanced"
+      }
+    ],
+    "capacity_diagnostic": [
+      {
+        "name": "decision_tree_depth6",
+        "family": "decision_tree",
+        "parameters": {
+          "max_depth": 6,
+          "min_samples_split": 5,
+          "class_weight": "balanced"
+        }
+      },
+      {
+        "name": "random_forest_100",
+        "family": "random_forest",
+        "parameters": {
+          "n_estimators": 100,
+          "class_weight": "balanced"
+        }
+      },
+      {
+        "name": "extra_trees_100",
+        "family": "extra_trees",
+        "parameters": {
+          "n_estimators": 100,
+          "class_weight": "balanced"
+        }
+      },
+      {
+        "name": "gradient_boosting_default",
+        "family": "gradient_boosting",
+        "parameters": {}
+      },
+      {
+        "name": "knn_3",
+        "family": "knn",
+        "parameters": {
+          "n_neighbors": 3
+        }
+      },
+      {
+        "name": "knn_5",
+        "family": "knn",
+        "parameters": {
+          "n_neighbors": 5
+        }
+      },
+      {
+        "name": "linear_svm",
+        "family": "linear_svm",
+        "parameters": {
+          "class_weight": "balanced",
+          "max_iter": 20000
+        }
+      },
+      {
+        "name": "rbf_svm",
+        "family": "rbf_svm",
+        "parameters": {
+          "kernel": "rbf",
+          "class_weight": "balanced"
+        }
+      },
+      {
+        "name": "logistic_regression_balanced",
+        "family": "logistic_regression",
+        "parameters": {
+          "C": 1.0,
+          "class_weight": "balanced",
+          "max_iter": 20000
+        }
+      }
+    ],
+    "compact_ensemble": [
+      {
+        "name": "tree_depth6",
+        "family": "decision_tree",
+        "parameters": {
+          "max_depth": 6,
+          "min_samples_split": 5,
+          "class_weight": "balanced"
+        }
+      },
+      {
+        "name": "tree_depth8",
+        "family": "decision_tree",
+        "parameters": {
+          "max_depth": 8,
+          "min_samples_split": 5,
+          "class_weight": "balanced"
+        }
+      },
+      {
+        "name": "tree_depth10",
+        "family": "decision_tree",
+        "parameters": {
+          "max_depth": 10,
+          "min_samples_split": 5,
+          "class_weight": "balanced"
+        }
+      },
+      {
+        "name": "tree_depth12",
+        "family": "decision_tree",
+        "parameters": {
+          "max_depth": 12,
+          "min_samples_split": 5,
+          "class_weight": "balanced"
+        }
+      },
+      {
+        "name": "random_forest_3",
+        "family": "random_forest",
+        "parameters": {
+          "n_estimators": 3,
+          "max_depth": 8,
+          "min_samples_split": 5,
+          "class_weight": "balanced"
+        }
+      },
+      {
+        "name": "random_forest_5",
+        "family": "random_forest",
+        "parameters": {
+          "n_estimators": 5,
+          "max_depth": 8,
+          "min_samples_split": 5,
+          "class_weight": "balanced"
+        }
+      },
+      {
+        "name": "random_forest_10",
+        "family": "random_forest",
+        "parameters": {
+          "n_estimators": 10,
+          "max_depth": 8,
+          "min_samples_split": 5,
+          "class_weight": "balanced"
+        }
+      },
+      {
+        "name": "random_forest_20",
+        "family": "random_forest",
+        "parameters": {
+          "n_estimators": 20,
+          "max_depth": 8,
+          "min_samples_split": 5,
+          "class_weight": "balanced"
+        }
+      },
+      {
+        "name": "extra_trees_3",
+        "family": "extra_trees",
+        "parameters": {
+          "n_estimators": 3,
+          "max_depth": 8,
+          "min_samples_split": 5,
+          "class_weight": "balanced"
+        }
+      },
+      {
+        "name": "extra_trees_5",
+        "family": "extra_trees",
+        "parameters": {
+          "n_estimators": 5,
+          "max_depth": 8,
+          "min_samples_split": 5,
+          "class_weight": "balanced"
+        }
+      },
+      {
+        "name": "extra_trees_10",
+        "family": "extra_trees",
+        "parameters": {
+          "n_estimators": 10,
+          "max_depth": 8,
+          "min_samples_split": 5,
+          "class_weight": "balanced"
+        }
+      },
+      {
+        "name": "extra_trees_20",
+        "family": "extra_trees",
+        "parameters": {
+          "n_estimators": 20,
+          "max_depth": 8,
+          "min_samples_split": 5,
+          "class_weight": "balanced"
+        }
+      },
+      {
+        "name": "gradient_boosting_depth2_5",
+        "family": "gradient_boosting",
+        "parameters": {
+          "n_estimators": 5,
+          "learning_rate": 0.1,
+          "max_depth": 2
+        }
+      },
+      {
+        "name": "gradient_boosting_depth2_10",
+        "family": "gradient_boosting",
+        "parameters": {
+          "n_estimators": 10,
+          "learning_rate": 0.1,
+          "max_depth": 2
+        }
+      },
+      {
+        "name": "gradient_boosting_depth2_20",
+        "family": "gradient_boosting",
+        "parameters": {
+          "n_estimators": 20,
+          "learning_rate": 0.1,
+          "max_depth": 2
+        }
+      },
+      {
+        "name": "gradient_boosting_depth2_30",
+        "family": "gradient_boosting",
+        "parameters": {
+          "n_estimators": 30,
+          "learning_rate": 0.1,
+          "max_depth": 2
+        }
+      },
+      {
+        "name": "gradient_boosting_depth3_5",
+        "family": "gradient_boosting",
+        "parameters": {
+          "n_estimators": 5,
+          "learning_rate": 0.1,
+          "max_depth": 3
+        }
+      },
+      {
+        "name": "gradient_boosting_depth3_10",
+        "family": "gradient_boosting",
+        "parameters": {
+          "n_estimators": 10,
+          "learning_rate": 0.1,
+          "max_depth": 3
+        }
+      },
+      {
+        "name": "gradient_boosting_depth3_20",
+        "family": "gradient_boosting",
+        "parameters": {
+          "n_estimators": 20,
+          "learning_rate": 0.1,
+          "max_depth": 3
+        }
+      }
+    ],
+    "stability_candidates": [
+      {
+        "name": "tree_depth6_top126",
+        "family": "decision_tree",
+        "top_k": 126,
+        "parameters": {
+          "max_depth": 6,
+          "min_samples_split": 5,
+          "class_weight": "balanced"
+        }
+      },
+      {
+        "name": "tree_depth8_top160",
+        "family": "decision_tree",
+        "top_k": 160,
+        "parameters": {
+          "max_depth": 8,
+          "min_samples_split": 5,
+          "class_weight": "balanced"
+        }
+      },
+      {
+        "name": "gradient_boosting_depth3_5_all",
+        "family": "gradient_boosting",
+        "top_k": "all",
+        "parameters": {
+          "n_estimators": 5,
+          "learning_rate": 0.1,
+          "max_depth": 3
+        }
+      },
+      {
+        "name": "gradient_boosting_depth3_10_all",
+        "family": "gradient_boosting",
+        "top_k": "all",
+        "parameters": {
+          "n_estimators": 10,
+          "learning_rate": 0.1,
+          "max_depth": 3
+        }
+      },
+      {
+        "name": "gradient_boosting_depth3_20_all",
+        "family": "gradient_boosting",
+        "top_k": "all",
+        "parameters": {
+          "n_estimators": 20,
+          "learning_rate": 0.1,
+          "max_depth": 3
+        }
+      },
+      {
+        "name": "gradient_boosting_depth3_100_top126",
+        "family": "gradient_boosting",
+        "top_k": 126,
+        "parameters": {
+          "n_estimators": 100,
+          "learning_rate": 0.1,
+          "max_depth": 3
+        }
+      },
+      {
+        "name": "extra_trees_100_top160",
+        "family": "extra_trees",
+        "top_k": 160,
+        "parameters": {
+          "n_estimators": 100,
+          "class_weight": "balanced"
+        }
+      }
+    ],
+    "professor_suggestions": [
+      {
+        "name": "gradient_boosting_depth3_20_all",
+        "family": "gradient_boosting",
+        "top_k": "all",
+        "parameters": {
+          "n_estimators": 20,
+          "learning_rate": 0.1,
+          "max_depth": 3
+        }
+      },
+      {
+        "name": "logistic_regression_c0_1_all",
+        "family": "logistic_regression",
+        "top_k": "all",
+        "parameters": {
+          "C": 0.1,
+          "class_weight": null,
+          "max_iter": 20000
+        }
+      },
+      {
+        "name": "logistic_regression_c1_all",
+        "family": "logistic_regression",
+        "top_k": "all",
+        "parameters": {
+          "C": 1.0,
+          "class_weight": null,
+          "max_iter": 20000
+        }
+      },
+      {
+        "name": "logistic_regression_c10_all",
+        "family": "logistic_regression",
+        "top_k": "all",
+        "parameters": {
+          "C": 10.0,
+          "class_weight": null,
+          "max_iter": 20000
+        }
+      },
+      {
+        "name": "logistic_regression_c1_balanced_all",
+        "family": "logistic_regression",
+        "top_k": "all",
+        "parameters": {
+          "C": 1.0,
+          "class_weight": "balanced",
+          "max_iter": 20000
+        }
+      },
+      {
+        "name": "xgboost_depth2_10_all",
+        "family": "xgboost",
+        "top_k": "all",
+        "parameters": {
+          "n_estimators": 10,
+          "learning_rate": 0.1,
+          "max_depth": 2,
+          "min_child_weight": 1,
+          "subsample": 1.0,
+          "colsample_bytree": 1.0,
+          "reg_lambda": 1.0,
+          "tree_method": "hist"
+        }
+      },
+      {
+        "name": "xgboost_depth2_20_all",
+        "family": "xgboost",
+        "top_k": "all",
+        "parameters": {
+          "n_estimators": 20,
+          "learning_rate": 0.1,
+          "max_depth": 2,
+          "min_child_weight": 1,
+          "subsample": 1.0,
+          "colsample_bytree": 1.0,
+          "reg_lambda": 1.0,
+          "tree_method": "hist"
+        }
+      },
+      {
+        "name": "xgboost_depth3_20_all",
+        "family": "xgboost",
+        "top_k": "all",
+        "parameters": {
+          "n_estimators": 20,
+          "learning_rate": 0.1,
+          "max_depth": 3,
+          "min_child_weight": 1,
+          "subsample": 1.0,
+          "colsample_bytree": 1.0,
+          "reg_lambda": 1.0,
+          "tree_method": "hist"
+        }
+      }
+    ],
+    "feature_budget_families": [
+      {
+        "name": "gradient_boosting_depth3_20",
+        "family": "gradient_boosting",
+        "parameters": {
+          "n_estimators": 20,
+          "learning_rate": 0.1,
+          "max_depth": 3
+        }
+      },
+      {
+        "name": "xgboost_depth3_20",
+        "family": "xgboost",
+        "parameters": {
+          "n_estimators": 20,
+          "learning_rate": 0.1,
+          "max_depth": 3,
+          "min_child_weight": 1,
+          "subsample": 1.0,
+          "colsample_bytree": 1.0,
+          "reg_lambda": 1.0,
+          "tree_method": "hist"
+        }
+      }
+    ],
+    "comparison": []
+  },
+  "selection_policy": {
+    "primary_metric": "macro_f1_mean",
+    "macro_f1_tolerance": 0.005,
+    "prefer_movement_f1": true,
+    "prefer_lower_std": true,
+    "prefer_fewer_features": true,
+    "prefer_fewer_comparisons": true
+  },
+  "outputs": {
+    "results_root": "Tools/datasets/results/dataset_v2_complete_suite",
+    "quick_results_root": "Tools/datasets/results/dataset_v2_complete_suite_quick",
+    "processed_root": "Tools/datasets/processed",
+    "quick_processed_root": "Tools/datasets/processed/quick_smoke_test",
+    "realtime_config_file": "realtime_pipeline_config.json",
+    "realtime_model_file": "realtime_model.joblib",
+    "realtime_model_structure_file": "realtime_model_structure.json",
+    "training_bundle_file": "dataset_v2_training_bundle.joblib",
+    "versioned_realtime_config": "Tools/realtime/config/dataset_v2_realtime_pipeline_config.json",
+    "versioned_realtime_model_structure": "Tools/realtime/config/dataset_v2_realtime_model_structure.json"
+  },
+  "execution": {
+    "sampling_rate_mode": "measured_median",
+    "fallback_sampling_rate_hz": 50.0,
+    "random_state_for_correlation_sampling": 2026,
+    "overwrite_results": true,
+    "quick_mode": false,
+    "quick_files_per_stratum": 2,
+    "quick_subset_seed": 2026
+  }
+}

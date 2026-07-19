@@ -1,0 +1,8 @@
+{
+  "realtime_config": "C:\\Users\\Brazza\\Documents\\UFOP\\TCC\\Algoritmos\\Tools\\datasets\\processed\\realtime_pipeline_config.json",
+  "serialized_model": "C:\\Users\\Brazza\\Documents\\UFOP\\TCC\\Algoritmos\\Tools\\datasets\\processed\\realtime_model.joblib",
+  "model_structure": "C:\\Users\\Brazza\\Documents\\UFOP\\TCC\\Algoritmos\\Tools\\datasets\\processed\\realtime_model_structure.json",
+  "training_bundle": "C:\\Users\\Brazza\\Documents\\UFOP\\TCC\\Algoritmos\\Tools\\datasets\\processed\\dataset_v2_training_bundle.joblib",
+  "versioned_realtime_config": "C:\\Users\\Brazza\\Documents\\UFOP\\TCC\\Algoritmos\\Tools\\realtime\\config\\dataset_v2_realtime_pipeline_config.json",
+  "versioned_model_structure": "C:\\Users\\Brazza\\Documents\\UFOP\\TCC\\Algoritmos\\Tools\\realtime\\config\\dataset_v2_realtime_model_structure.json"
+}

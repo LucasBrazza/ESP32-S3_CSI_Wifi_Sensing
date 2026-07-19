@@ -1,0 +1,17 @@
+order,stage,objective,main_table,main_figure
+1,dataset_diagnostics,"Validate packet counts, rates, labels, sessions and quadrants.",tables/dataset_summary.csv,figures/dataset_file_distribution.png
+2,correlation_threshold_search,Retune redundant-subcarrier removal for Dataset v2.,tables/correlation_threshold_summary.csv,figures/correlation_threshold_macro_f1.png
+3,window_step_search,Select temporal window and update interval in seconds.,tables/window_step_comparison_summary.csv,figures/window_step_macro_f1.png
+4,decision_tree_tuning,Tune the compact decision-tree baseline.,tables/decision_tree_tuning_summary.csv,figures/decision_tree_tuning_macro_f1.png
+5,classifier_capacity_diagnostic,Classifier-capacity diagnostic,tables/classifier_capacity_diagnostic_summary.csv,figures/classifier_capacity_diagnostic_macro_f1.png
+6,compact_ensemble_search,Compact tree and ensemble comparison,tables/compact_ensemble_search_summary.csv,figures/compact_ensemble_search_macro_f1.png
+7,classifier_stability_validation,Classifier stability across repeated file splits,tables/classifier_stability_validation_summary.csv,figures/classifier_stability_validation_macro_f1.png
+8,professor_suggestions_comparison,"Logistic Regression, Gradient Boosting and XGBoost comparison",tables/professor_suggestions_comparison_summary.csv,figures/professor_suggestions_comparison_macro_f1.png
+9,feature_budget_comparison,Feature-budget comparison for Gradient Boosting and XGBoost,tables/feature_budget_comparison_summary.csv,figures/feature_budget_comparison_macro_f1.png
+10,final_candidate_selection,Select the final model from stable compact candidates.,tables/final_candidate_selection.csv,figures/final_candidate_selection.png
+11,final_candidate_evaluation,Final candidate repeated file-holdout evaluation,tables/final_candidate_evaluation_summary.csv,figures/final_candidate_evaluation_macro_f1.png
+12,dataset_split_quality_diagnostic,"Document split stability and the weakest files, sessions and quadrants.",tables/file_performance.csv,figures/quadrant_performance.png
+13,binary_task_diagnostics,Identify whether presence or motion-state separation is the bottleneck.,tables/binary_tasks_summary.csv,figures/binary_tasks_macro_f1.png
+14,hierarchical_comparison,Test whether a two-stage classifier improves the direct model.,tables/hierarchical_comparison_summary.csv,figures/hierarchical_comparison_macro_f1.png
+15,session_holdout,Evaluate generalization to an unseen session/day.,tables/session_holdout_results.csv,figures/session_holdout_macro_f1.png
+16,quadrant_holdout,Evaluate generalization to an unseen room position.,tables/quadrant_holdout_results.csv,figures/quadrant_holdout_macro_f1.png
