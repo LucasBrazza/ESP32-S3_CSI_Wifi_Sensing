@@ -43,6 +43,13 @@ desktop.ini
 
 datasets/raw_bin/
 datasets/processed/
+# Local CSI datasets
+
+Tools/datasets/archive/
+Tools/datasets/raw_bin/session_*/
+
+# Local GUI comparison files
+Tools/acquisition/gui/*.diff
 
 # ==================================================
 # LOGS / TEMPORARY FILES
