@@ -167,5 +167,16 @@ void wifi_manager_start(void)
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
 
-    ESP_LOGI(TAG, "Wi-Fi station started");
+    /*
+    * Disable Wi-Fi power saving during CSI acquisition.
+    *
+    * This keeps the radio continuously active and helps maintain a more
+    * regular packet reception rate.
+    */
+    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
+
+    ESP_LOGI(
+        TAG,
+        "Wi-Fi station started with power saving disabled"
+    );
 }

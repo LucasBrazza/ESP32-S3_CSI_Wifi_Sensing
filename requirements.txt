@@ -1,4 +1,10 @@
-matplotlib>=3.9
-pyserial>=3.5
-PyQt5>=5.15
-pyqtgraph>=0.13
+# Aquisição, visualização e processamento numérico
+matplotlib>=3.9,<4
+numpy>=2.0,<3
+pyserial>=3.5,<4
+PyQt5>=5.15,<6
+pyqtgraph>=0.13,<1
+
+# Experimentos comparativos da branch de pesquisa e validação de classificadores
+scikit-learn>=1.5,<2
+xgboost>=3.0,<4

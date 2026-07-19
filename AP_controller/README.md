@@ -1,239 +1,116 @@
 # AP_controller
 
-Firmware responsável por configurar um ESP32-S3 como ponto de acesso Wi-Fi, também chamado de AP (*Access Point*).
+Firmware do ESP32-S3 responsável por criar a rede Wi-Fi experimental e gerar tráfego UDP unicast controlado para o `STA_CSI_receiver`.
 
-No fluxo deste projeto, o `AP_controller` não coleta CSI. Sua função é criar a rede Wi-Fi e gerar pacotes para que outro ESP32-S3, configurado como receptor, consiga capturar os dados CSI.
+O AP não coleta CSI. Sua função é manter as condições de transmissão reproduzíveis para que o STA capture uma amostra CSI por pacote recebido.
 
----
+## Configuração atual
 
-# Ideia geral
+| Parâmetro | Valor atual | Origem |
+|---|---:|---|
+| Modo Wi-Fi | Access Point | `main.c` |
+| Largura de banda | 20 MHz (`WIFI_BW20`) | `main.c` |
+| Intervalo UDP | 20 ms | `UDP_INTERVAL_MS` |
+| Taxa solicitada | 50 pacotes/s | derivada do intervalo |
+| IP de destino | `192.168.4.2` | `UDP_TARGET_IP` |
+| Porta UDP | `3333` | `UDP_TARGET_PORT` |
+| Canal padrão | 6 | `Kconfig.projbuild` |
+| Máximo de clientes | 1 | `Kconfig.projbuild` |
 
-A coleta CSI depende da recepção de pacotes Wi-Fi.
+SSID, senha, canal e número máximo de clientes são configuráveis por `idf.py menuconfig` no menu **Wi-Fi CSI Project Configuration**.
 
-Por isso, o projeto utiliza dois dispositivos:
-
-```text
-ESP32-S3 AP_controller
-        │
-        │ envia pacotes UDP
-        ▼
-ESP32-S3 STA_CSI_receiver
-        │
-        │ coleta CSI dos pacotes recebidos
-        ▼
-Computador
-```
-
-O `AP_controller` é o primeiro bloco desse fluxo.
-
-Ele cria uma rede Wi-Fi própria e envia pacotes UDP continuamente para o receptor.
-
----
-
-# O que este firmware faz
-
-De forma simples, este firmware executa as seguintes etapas:
+## Funcionamento
 
 ```text
-1. Liga o ESP32-S3
-2. Inicializa os recursos internos necessários
-3. Configura o Wi-Fi em modo Access Point
-4. Cria uma rede Wi-Fi
-5. Aguarda o receptor conectar
-6. Envia pacotes UDP continuamente
+Inicialização do NVS
+    ↓
+Wi-Fi em modo AP
+    ↓
+SSID, senha e canal configurados
+    ↓
+interface iniciada e fixada em HT20
+    ↓
+tarefa UDP periódica
+    ↓
+pacote enviado ao STA a cada 20 ms
 ```
 
-Esses pacotes UDP servem apenas para gerar tráfego Wi-Fi.
+A tarefa usa `xTaskDelayUntil()` para manter o período referenciado ao instante anterior. Assim, o tempo gasto na montagem e no envio do pacote não é somado continuamente ao intervalo de 20 ms.
 
-Eles não carregam dados importantes para análise neste momento.
-
----
-
-# Por que enviar pacotes UDP?
-
-O ESP32-S3 receptor só consegue coletar CSI quando recebe pacotes Wi-Fi.
-
-Então, se não houver tráfego entre os dispositivos, a coleta CSI fica limitada ou irregular.
-
-O envio UDP resolve isso criando um fluxo simples e constante de pacotes:
+O payload contém uma sequência e o timestamp interno do AP:
 
 ```text
-Pacotes UDP constantes
-        ↓
-Recepção Wi-Fi constante no STA
-        ↓
-Callback CSI acionada
-        ↓
-Dados CSI disponíveis para coleta
+CSI_PKT,<sequence>,<timestamp_us>
 ```
 
----
+Esses campos são úteis para diagnóstico do emissor, mas o dataset principal é formado pelos metadados e pelo CSI capturados no STA.
 
-# Relação com o receptor CSI
+## Por que o AP é fixado em 20 MHz?
 
-O `AP_controller` e o `STA_CSI_receiver` trabalham juntos.
-
-O AP cria a rede e envia pacotes.
-
-O STA conecta nessa rede e coleta CSI.
+Durante os testes em HT40, os quadros recebidos alternavam entre 20 e 40 MHz, produzindo vetores CSI com tamanhos diferentes (`256` e `384`). O uso de `WIFI_BW20` estabiliza a forma do dado na configuração atual:
 
 ```text
-AP_controller
-   └── cria a rede e envia pacotes
-
-STA_CSI_receiver
-   └── conecta na rede e coleta CSI
+csi_len = 256 inteiros int8
+          ↓
+128 pares imag/real
+          ↓
+128 valores complexos
 ```
 
-Portanto, para reproduzir o experimento, o AP deve ser iniciado antes do receptor.
+## Arquivos principais
 
----
-
-# Configurações principais
-
-As configurações mais importantes deste firmware são:
-
-| Configuração | Função |
+| Arquivo | Responsabilidade |
 |---|---|
-| SSID | Nome da rede Wi-Fi criada pelo AP. |
-| Senha | Senha usada pelo receptor para conectar. |
-| Canal Wi-Fi | Canal usado no experimento. Deve ser mantido fixo. |
-| IP do receptor | Endereço para onde os pacotes UDP são enviados. |
-| Porta UDP | Porta usada para envio dos pacotes. |
-| Intervalo de envio | Tempo entre um pacote UDP e outro. |
+| `main/main.c` | inicialização do AP, largura de banda e tarefa UDP |
+| `main/Kconfig.projbuild` | SSID, senha, canal e número máximo de clientes |
+| `sdkconfig` | configuração gerada pelo ESP-IDF |
 
-O canal Wi-Fi é especialmente importante, pois alterações no canal podem mudar o comportamento dos dados CSI.
+## Compilar e gravar
 
----
+Carregue primeiro o ambiente ESP-IDF 6.0. Depois, dentro da pasta do projeto:
 
-# Como executar
-
-Os comandos abaixo devem ser executados dentro da pasta do `AP_controller`.
-
-```bash
+```powershell
 cd AP_controller
-```
-
----
-
-# 1. Selecionar o alvo ESP32-S3
-
-```bash
 idf.py set-target esp32s3
-```
-
-Esse comando informa ao ESP-IDF que o projeto será compilado para o ESP32-S3.
-
----
-
-# 2. Configurar o projeto
-
-```bash
 idf.py menuconfig
-```
-
-No menu de configuração, ajuste os parâmetros principais do AP, como:
-
-- nome da rede Wi-Fi;
-- senha;
-- canal Wi-Fi;
-- demais parâmetros disponíveis no projeto.
-
-Depois de configurar, salve e saia do menu.
-
----
-
-# 3. Compilar o firmware
-
-```bash
 idf.py build
+idf.py -p COM3 flash
 ```
 
-Esse comando compila o projeto e gera o firmware que será gravado no ESP32-S3.
+A porta `COM3` é apenas o exemplo usado no ambiente de desenvolvimento; ajuste conforme o computador.
 
----
+## Monitorar
 
-# 4. Gravar o firmware
-
-Substitua `COMx` pela porta serial correta do seu ESP32-S3.
-
-```bash
-idf.py flash -p COMx
+```powershell
+idf.py -p COM3 monitor
 ```
 
-Exemplo no Windows:
-
-```bash
-idf.py flash -p COM4
-```
-
----
-
-# 5. Abrir o monitor serial
-
-```bash
-idf.py monitor -p COMx
-```
-
-Exemplo:
-
-```bash
-idf.py monitor -p COM4
-```
-
-Também é possível gravar e abrir o monitor em um único comando:
-
-```bash
-idf.py flash -p COMx monitor
-```
-
----
-
-# Ordem recomendada de execução
-
-Para reproduzir o experimento, siga esta ordem:
+O firmware informa as estatísticas aproximadamente uma vez por segundo. O resultado esperado é semelhante a:
 
 ```text
-1. Grave e execute o AP_controller
-2. Verifique se a rede Wi-Fi foi criada
-3. Grave e execute o STA_CSI_receiver
-4. Aguarde o STA conectar ao AP
-5. Verifique se o AP começou a enviar pacotes UDP
-6. Verifique no receptor se os dados CSI estão sendo impressos
-7. Execute as ferramentas no computador para salvar os dados
+UDP stats: rate=50.00 pkt/s, sent=50, errors=0
 ```
 
----
+Pequenas oscilações ao redor de 50 pacotes/s são aceitáveis. Erros contínuos ou ausência de envios indicam que o STA ainda não recebeu o IP esperado ou que há problema na conexão.
 
-# Resultado esperado
-
-Quando o firmware estiver funcionando corretamente:
+Para sair do monitor do ESP-IDF:
 
 ```text
-O ESP32-S3 cria uma rede Wi-Fi
-        ↓
-O receptor conecta nessa rede
-        ↓
-O AP envia pacotes UDP continuamente
-        ↓
-O receptor passa a receber pacotes
-        ↓
-A coleta CSI pode ser realizada no STA
+Ctrl + ]
 ```
 
-O sucesso do `AP_controller` é observado quando:
+## Ordem de inicialização
 
-- a rede Wi-Fi aparece disponível;
-- o receptor consegue se conectar;
-- os pacotes UDP são enviados continuamente;
-- o receptor passa a gerar dados CSI.
+1. ligue e valide o `AP_controller`;
+2. ligue ou reinicie o `STA_CSI_receiver`;
+3. aguarde o STA receber o IP `192.168.4.2`;
+4. abra a GUI de aquisição na porta serial do STA.
 
----
+## Critérios de validação
 
-# Observações importantes
-
-- Inicie o AP antes do receptor.
-- Mantenha o canal Wi-Fi fixo durante os testes.
-- Use o mesmo SSID e senha configurados no receptor.
-- Confirme se o IP de destino do UDP corresponde ao IP do receptor.
-- Evite alterar a taxa de envio UDP sem observar o impacto na coleta CSI.
+- AP criado no canal configurado;
+- largura de banda informada como HT20;
+- STA conectado;
+- taxa UDP próxima de 50 pacotes/s;
+- `errors=0` nas estatísticas do AP;
+- no STA, apenas `bandwidth=20MHz` e `csi_len=256` na configuração atual.

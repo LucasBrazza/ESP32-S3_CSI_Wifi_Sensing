@@ -1,231 +1,261 @@
 # Tools
 
-A pasta `Tools` contém todas as ferramentas executadas no computador durante a aquisição, organização, visualização e armazenamento dos dados CSI coletados pelos ESP32-S3.
+Ferramentas Python para aquisição, armazenamento, inspeção, pré-processamento, treinamento, validação e inferência usando os dados CSI enviados pelo `STA_CSI_receiver`.
 
-O fluxo principal do projeto funciona da seguinte forma:
+## Requisitos
 
-```text
-AP_controller
-        │
-        │ envia pacotes Wi-Fi
-        ▼
-STA_CSI_receiver
-        │
-        │ coleta CSI
-        │
-        │ envia dados pela serial
-        ▼
-Tools/acquisition
-        │
-        │ interpreta os dados recebidos
-        ▼
-Tools/csi
-        │
-        │ organiza e salva os pacotes
-        ▼
-Tools/datasets
+O ambiente validado utiliza Python 3.11.
+
+Na raiz do repositório:
+
+```powershell
+python -m venv .venv
+Set-ExecutionPolicy -Scope Process Bypass
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
 ```
 
----
+Somente para a interface de aquisição:
 
-# Estrutura CSI utilizada no projeto
-
-Os dados enviados pelo ESP32-S3 possuem o seguinte formato:
-
-```text
-CSI,<timestamp_us>,<rssi>,<rate>,<channel>,<len>,imag0,real0,imag1,real1,...
+```powershell
+python -m pip install -r Tools/acquisition/gui/requirements.txt
 ```
 
-Os primeiros campos representam os metadados do pacote:
+## Fluxo de aquisição atual
 
-| Campo | Descrição |
+```text
+AP: UDP unicast a 50 Hz e HT20
+    ↓
+STA: callback CSI + fila FreeRTOS
+    ↓
+CSI2 binário a 921600 baud
+    ↓
+CSIFrameParser
+    ↓
+CSIViewer
+    ↓
+CSIBIN1 versão 2
+```
+
+A implementação textual antiga foi substituída no fluxo oficial pelo protocolo binário. Os scripts de CLI antigos permanecem úteis para histórico e depuração, mas a GUI é a ferramenta principal para novas coletas.
+
+## Interface gráfica
+
+Execute a partir da raiz do repositório:
+
+```powershell
+python Tools/acquisition/gui/csi_viewer.py
+```
+
+Configurações principais:
+
+| Campo | Valor ou função |
 |---|---|
-| `timestamp_us` | Timestamp interno do ESP32-S3. |
-| `rssi` | Intensidade do sinal recebido. |
-| `rate` | Taxa física do pacote Wi-Fi. |
-| `channel` | Canal Wi-Fi utilizado. |
-| `len` | Quantidade total de inteiros CSI. |
+| Porta | porta serial do STA, normalmente COM4 no ambiente de desenvolvimento |
+| Baud | `921600` |
+| Classe | `empty`, `static_presence` ou `movement` |
+| Offset | atraso antes do início da janela de coleta |
+| Duração | 5 s por padrão |
+| Output folder | pasta-base escolhida para a sessão/quadrante |
 
-Após os metadados, os dados CSI são enviados em formato intercalado:
-
-```text
-imag0, real0,
-imag1, real1,
-imag2, real2,
-...
-```
-
-Atualmente o projeto normalmente trabalha com:
+O arquivo é salvo em:
 
 ```text
-len = 384
+<output folder>/raw_bin/<classe>_AAAAMMDD_HHMMSS.bin
 ```
 
-Isso significa:
+Exemplo de organização do Dataset v2:
 
 ```text
-384 inteiros
-        ↓
-192 pares imag/real
-        ↓
-192 subportadoras complexas
+Tools/datasets/raw_v2/
+└── session_01/
+    ├── quad1/raw_bin/
+    ├── quad2/raw_bin/
+    ├── quad3/raw_bin/
+    ├── quad4/raw_bin/
+    └── quad5/raw_bin/
 ```
 
-O pipeline oficial do projeto trabalha exclusivamente com:
+A classe já é armazenada dentro de cada pacote e também aparece no nome do arquivo. A sessão e o quadrante são representados atualmente pela estrutura de pastas.
+
+## Diagnósticos da GUI
+
+A barra de status apresenta:
+
+| Indicador | Significado |
+|---|---|
+| `Rate` | amostras recebidas no último segundo |
+| `Seq gaps` | amostras ausentes detectadas pelo campo de sequência |
+| `CRC` | frames com CRC inválido |
+| `PC drops` | eventos descartados porque a fila do computador encheu |
+| `ESP drops` | amostras descartadas porque a fila FreeRTOS encheu |
+| `ESP pending` | amostras aguardando serialização no STA |
+
+Uma coleta oficial deve ser aceita somente quando os contadores de erro e descarte estiverem em zero e a taxa estiver próxima de 50 Hz.
+
+## Protocolo serial
+
+O parser em `acquisition/gui/csi_parser.py` processa frames com:
 
 ```text
-imag
-real
-metadata
+Magic: CSI2
+Versão: 1
+Tipos: sample e stats
+Ordem de bytes: little-endian
+Integridade: CRC-16/CCITT-FALSE
 ```
 
+A amostra contém sequência, timestamp do ESP32, RSSI, rate, canal, flags, tamanho e CSI bruto. O parser separa automaticamente o vetor intercalado em arrays `imag` e `real`.
 
----
-
-# Organização das ferramentas
-
-A pasta `acquisition/cli/` contém os loggers executados pelo terminal.
-
-O arquivo `serial_logger_raw.py` é o logger principal do projeto. Sua função é abrir a serial do ESP32-S3, identificar linhas CSI válidas e salvar os dados brutos em arquivos binários.
-
-O arquivo `serial_logger_parsed.py` realiza aquisição utilizando os dados já organizados em estruturas internas do projeto, permitindo validar o fluxo de parsing durante a coleta.
-
-O arquivo `serial_logger_parsed_debug.py` é utilizado para depuração do pipeline de aquisição e validação detalhada dos pacotes CSI recebidos.
-
----
-
-A pasta `acquisition/gui/` contém as ferramentas gráficas utilizadas durante a aquisição.
-
-O arquivo `csi_parser.py` recebe as linhas CSI vindas da serial e transforma os dados textuais em estruturas organizadas contendo:
-
-- metadata;
-- imag;
-- real.
-
-Esse parser não realiza cálculos derivados.
-
-O arquivo `csi_viewer.py` é a interface gráfica principal do projeto. Sua função é visualizar os sinais CSI em tempo real durante a coleta, permitindo validar estabilidade dos dados, comportamento do sinal e funcionamento geral do sistema.
-
-O arquivo `requirements.txt` contém as dependências Python utilizadas pelas ferramentas gráficas.
-
----
-
-A pasta `csi/` contém o núcleo responsável por representar, interpretar, converter e salvar os pacotes CSI.
-
-O arquivo `csi_packet.py` define a estrutura utilizada para representar um pacote CSI dentro do projeto, padronizando os dados utilizados internamente.
-
-O arquivo `csi_binary_io.py` é responsável pelo salvamento e leitura dos arquivos binários do projeto, realizando serialização e desserialização dos pacotes CSI.
-
-O arquivo `bin_to_csv.py` converte arquivos binários para CSV, permitindo inspeção manual dos dados coletados.
-
----
-
-A pasta `datasets/` contém os datasets gerados durante os experimentos.
-
-A pasta `datasets/bin/` armazena os datasets binários originais, preservando a coleta exatamente como foi realizada.
-
-A pasta `datasets/csv/` contém versões CSV dos datasets, utilizadas principalmente para validação, inspeção manual e compatibilidade com ferramentas externas.
-
----
-
-A pasta `experiments/` contém ferramentas e scripts que não fazem parte do pipeline oficial do projeto.
-
-A pasta `experiments/deprecated/` armazena arquivos antigos ou removidos do fluxo principal.
-
-A pasta `experiments/features/` é destinada para estudos relacionados à extração de features e processamento derivado.
-
-A pasta `experiments/subcarrier_analysis/` contém experimentos relacionados à análise e seleção de subportadoras.
-
-Essas etapas não fazem parte do pipeline oficial neste momento.
-
----
-
-# Fluxo oficial do projeto
-
-O fluxo principal atualmente é:
+Na configuração atual HT20:
 
 ```text
-ESP32
-        ↓
-serial_logger_raw
-        ↓
-RAW BIN
-        ↓
-bin_to_csv
-        ↓
-RAW CSV
+csi_len = 256 inteiros int8
+imag = 128 valores
+real = 128 valores
 ```
 
-O formato binário é o formato principal do projeto.
+## Formato de dataset binário
 
-O CSV é utilizado apenas como formato auxiliar para inspeção e análise.
-
----
-
-# Execução das ferramentas
-
-Todos os comandos abaixo devem ser executados dentro da pasta `Tools`.
-
-```bash
-cd Tools
-```
-
-Instalar dependências do viewer:
-
-```bash
-pip install -r acquisition/gui/requirements.txt
-```
-
-Executar o logger principal:
-
-```bash
-python acquisition/cli/serial_logger_raw.py
-```
-
-Executar interface gráfica:
-
-```bash
-python acquisition/gui/csi_viewer.py
-```
-
-Converter binário para CSV:
-
-```bash
-python csi/bin_to_csv.py input.bin output.csv
-```
-
----
-
-# Objetivo arquitetural
-
-A arquitetura atual foi organizada para separar claramente:
+O módulo `csi/csi_binary_io.py` usa:
 
 ```text
-aquisição
-↓
-representação CSI
-↓
-armazenamento
-↓
-visualização
-↓
-experimentos
+Magic do arquivo: CSIBIN1
+Versão atual de escrita: 2
+Versões aceitas na leitura: 1 e 2
 ```
 
-Essa separação facilita:
+Cada pacote da versão 2 preserva:
 
-- manutenção;
-- expansão do projeto;
-- reprodutibilidade;
-- evolução futura do pipeline.
+- `label`;
+- `pc_timestamp`;
+- `capture_timestamp`, alinhado ao relógio do ESP32;
+- `esp_timestamp_us`;
+- `sequence`;
+- `packet_index`;
+- `rssi`;
+- `rate`;
+- `channel`;
+- `csi_len`;
+- `flags`;
+- vetores `imag` e `real` em `int16`.
 
----
+A leitura de arquivos versão 1 continua suportada, mas os campos que não existiam nessa versão recebem valores de compatibilidade.
 
-# Observações importantes
+## Conversão para CSV
 
-- O dataset bruto deve sempre ser preservado.
-- O formato binário é o formato principal do projeto.
-- O CSV é utilizado apenas como formato auxiliar.
-- O parser não deve calcular dados derivados.
-- O processamento pesado deve ocorrer fora do pipeline oficial.
-- O pipeline principal deve permanecer simples e reproduzível.
+O binário é o formato bruto oficial. CSV deve ser usado apenas para inspeção:
+
+```powershell
+python Tools/csi/bin_to_csv.py arquivo.bin arquivo.csv
+```
+
+## Organização das ferramentas
+
+### `acquisition/`
+
+- `gui/csi_parser.py`: parser incremental CSI2 e diagnósticos;
+- `gui/csi_viewer.py`: visualização e coleta binária;
+- `check_dataset.py`: verificações de integridade do dataset;
+- `analysis_dataset.py`: análises gerais das coletas;
+- `cli/`: loggers anteriores e ferramentas de depuração.
+
+### `csi/`
+
+- `csi_binary_io.py`: leitura e escrita CSIBIN1 v1/v2;
+- `csi_packet.py`: representação interna de pacote;
+- `bin_to_csv.py`: conversão auxiliar.
+
+### `preprocessing/`
+
+Fluxo numerado atual:
+
+```text
+00_diagnose_dataset_packets.py
+01_process_dataset.py
+02_extract_features.py
+03_subcarrier_variance_diagnostics.py
+04_correlation_threshold_diagnostics.py
+```
+
+Módulos auxiliares implementam:
+
+- amplitude a partir de I/Q;
+- limpeza e filtragem de Hampel;
+- média móvel;
+- normalização z-score;
+- correlação entre subportadoras;
+- janelas deslizantes;
+- extração e seleção de features.
+
+Os parâmetros ficam centralizados em:
+
+```text
+Tools/preprocessing/pipeline_parameters.json
+```
+
+### `training/`
+
+Os scripts numerados realizam, entre outras tarefas:
+
+- Fisher Score e seleção Top-K;
+- treinamento da árvore de decisão;
+- análise das features selecionadas;
+- holdout estratificado e holdout por arquivo;
+- tuning de profundidade, divisão mínima e Top-K;
+- diagnóstico binário;
+- validação hierárquica;
+- análise específica de `static_presence` versus `movement`.
+
+A separação por arquivo deve ser preferida para evitar que janelas do mesmo arquivo apareçam simultaneamente em treino e teste.
+
+Na branch `research/literature-guided-pipeline-review`, os experimentos adicionais com Regressão Logística, Gradient Boosting e XGBoost usam `scikit-learn` e `xgboost`. O candidato provisório selecionado antes da nova coleta é Gradient Boosting com Top-K 126, 20 estimadores, profundidade 3 e `learning_rate=0.1`; ele não deve ser tratado como modelo final até a repetição dos testes com o Dataset v2.
+
+### `classification/`
+
+`decision_tree.py` contém uma árvore de decisão própria, sem dependência obrigatória de `scikit-learn` na inferência. Essa escolha facilita a inspeção da estrutura e a futura tradução do modelo para execução embarcada.
+
+### `real_time/`
+
+`01_realtime_inference.py` concentra o fluxo de inferência em tempo real. Os parâmetros de normalização, subportadoras selecionadas, features e modelo devem ser os mesmos utilizados no treinamento.
+
+## Pipeline conceitual
+
+```text
+raw_bin
+    ↓
+leitura dos pacotes
+    ↓
+amplitude
+    ↓
+limpeza
+    ↓
+Hampel
+    ↓
+média móvel
+    ↓
+z-score
+    ↓
+remoção de redundância
+    ↓
+janelas deslizantes
+    ↓
+features
+    ↓
+Fisher Score / Top-K
+    ↓
+classificador
+    ↓
+validação por arquivo e por quadrante
+```
+
+## Observações
+
+- preserve sempre os arquivos binários brutos;
+- não misture automaticamente arquivos v1 e v2 em um mesmo experimento;
+- coletas antigas tinham frequência efetiva diferente e exigem reavaliação do tamanho da janela;
+- a janela deve ser definida em segundos e convertida para pacotes conforme a taxa real;
+- arquivos em `datasets/processed` são regeneráveis;
+- resultados finais em `datasets/results` fazem parte do histórico experimental do TCC;
+- não versione `.venv`, `build`, `__pycache__`, `.pyc` ou coletas temporárias.
