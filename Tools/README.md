@@ -261,19 +261,19 @@ O motor espera:
 160 features selecionadas
 ```
 
-## Calibração inicial
+## Calibração opcional
 
-Antes do monitoramento:
+A detecção realtime utiliza diretamente os parâmetros exportados pelo treinamento. Médias, desvios, subportadoras e features não são recalculados na inicialização.
 
-1. a GUI apresenta uma contagem regressiva;
-2. o usuário deixa o ambiente vazio;
-3. a serial é aberta;
-4. o buffer é preenchido;
-5. janelas iniciais são avaliadas;
-6. a calibração é aprovada ou rejeitada;
-7. o motor é reiniciado para o monitoramento operacional.
+A opção **Calibração opcional** do menu executa apenas uma verificação de referência:
 
-As previsões da calibração não são usadas como decisões operacionais.
+1. abre a serial;
+2. preenche o buffer;
+3. avalia algumas janelas;
+4. registra classes e probabilidades;
+5. salva um resumo na pasta da execução.
+
+Essa verificação não aprova ou rejeita o modelo, não altera os artefatos e não é necessária para iniciar o realtime.
 
 ## Máquina de estados
 

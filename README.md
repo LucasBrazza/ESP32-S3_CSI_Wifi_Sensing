@@ -144,9 +144,11 @@ Tools/realtime/state_machine_config_candidate_v4.json
 
 O arquivo `.joblib` é um artefato binário gerado localmente pelo treinamento e pode não estar incluído no repositório. A opção **Verificar instalação** informa quando algum desses arquivos está ausente.
 
-## Calibração inicial
+## Calibração opcional
 
-Ao iniciar a detecção realtime, a aplicação executa:
+As médias, os desvios, as subportadoras e as features são exportados pelo treinamento. A detecção realtime usa esses valores diretamente e não recalibra o pipeline a cada inicialização.
+
+O fluxo normal é:
 
 ```text
 contagem regressiva
@@ -155,22 +157,10 @@ abertura da porta serial
     ↓
 preenchimento do buffer
     ↓
-calibração com o ambiente vazio
-    ↓
-reinicialização do buffer operacional
-    ↓
 monitoramento contínuo
 ```
 
-Durante a calibração, o usuário deve deixar o ambiente vazio. A aplicação avalia a proporção de janelas classificadas como `empty`, a probabilidade média dessa classe e a taxa de pacotes.
-
-Quando a calibração não é aprovada, são oferecidas as opções:
-
-- repetir a calibração;
-- iniciar mesmo assim;
-- cancelar.
-
-O resultado é salvo em `calibration.json` dentro da pasta da execução.
+A opção **Calibração opcional** registra como o modelo treinado responde a uma condição de referência. Ela pode ser usada após alterar o ambiente, a posição dos dispositivos ou os artefatos do modelo. Essa verificação não modifica parâmetros e não bloqueia o realtime.
 
 ## Fluxo de aquisição
 
