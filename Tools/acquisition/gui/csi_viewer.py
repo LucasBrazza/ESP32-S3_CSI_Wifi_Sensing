@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import csv
-import json
 import queue
 import re
-import subprocess
 import sys
 import threading
 import time
@@ -15,7 +12,7 @@ from pathlib import Path
 import pyqtgraph as pg
 import serial
 import serial.tools.list_ports
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtWidgets
 
 try:
     import winsound
@@ -55,32 +52,11 @@ PROGRAMMED_CLASS_ORDERS = (
     ("static_presence", "movement", "empty"),
 )
 
-CLASS_SPOKEN_NAMES = {
-    "empty": "Empty",
-    "static_presence": "Static",
-    "movement": "Movement",
-}
-
-# Used only as a fallback if Windows TTS is unavailable.
 CLASS_BEEP_COUNTS = {
     "empty": 1,
     "static_presence": 2,
     "movement": 3,
 }
-
-REALTIME_TEST_SEQUENCE = (
-    ("empty", True, "Empty"),
-    ("transition", False, "Prepare for static"),
-    ("static_presence", True, "Static"),
-    ("transition", False, "Prepare for movement"),
-    ("movement", True, "Movement"),
-    ("transition", False, "Prepare for static"),
-    ("static_presence", True, "Static"),
-    ("transition", False, "Prepare for movement"),
-    ("movement", True, "Movement"),
-    ("transition", False, "Leave the monitored area"),
-    ("empty", True, "Empty"),
-)
 
 DATASET_DIR = TOOLS_DIR / "datasets"
 RAW_BIN_DIR = DATASET_DIR / "raw_bin"
@@ -118,11 +94,18 @@ class SerialReader:
     def stop(self) -> None:
         self.running = False
 
-        if self.serial_conn and self.serial_conn.is_open:
-            self.serial_conn.close()
+        # On Windows, the reader thread and the GUI can reach close()
+        # almost simultaneously. PySerial may then find an already released
+        # OVERLAPPED handle, so closing is intentionally idempotent.
+        if self.serial_conn is not None:
+            try:
+                if self.serial_conn.is_open:
+                    self.serial_conn.close()
+            except (serial.SerialException, OSError, AttributeError):
+                pass
 
         if self.thread and self.thread.is_alive():
-            self.thread.join(timeout=1.0)
+            self.thread.join(timeout=1.5)
 
     def diagnostics(self) -> dict[str, int | str]:
         diagnostics: dict[str, int | str] = self.parser.diagnostics()
@@ -176,8 +159,12 @@ class SerialReader:
             self.last_error = str(exc)
 
         finally:
-            if self.serial_conn and self.serial_conn.is_open:
-                self.serial_conn.close()
+            if self.serial_conn is not None:
+                try:
+                    if self.serial_conn.is_open:
+                        self.serial_conn.close()
+                except (serial.SerialException, OSError, AttributeError):
+                    pass
 
             self.running = False
 
@@ -263,25 +250,7 @@ class CSIViewer(QtWidgets.QMainWindow):
         self.programmed_plan: list[dict[str, int | str]] = []
         self.programmed_index = 0
 
-        self.realtime_active = False
-        self.realtime_waiting_preparation = False
-        self.realtime_stop_requested = False
-        self.realtime_plan: list[dict[str, object]] = []
-        self.realtime_index = -1
-        self.realtime_start_time: float | None = None
-        self.realtime_current_start: float | None = None
-        self.realtime_current_end: float | None = None
-        self.realtime_current_label = ""
-        self.realtime_packets: list[dict] = []
-        self.realtime_annotations: list[dict[str, object]] = []
-        self.realtime_packet_index = 0
-        self.realtime_scenario = "realtime_test"
-        self.realtime_session = "session_01"
-        self.realtime_output_dir = DATASET_DIR
-        self.realtime_total_duration = 0.0
-
         self._build_ui()
-        self._configure_window_shortcuts()
 
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.process_events_and_update_plots)
@@ -292,16 +261,8 @@ class CSIViewer(QtWidgets.QMainWindow):
     def _build_ui(self) -> None:
         central = QtWidgets.QWidget()
         main_layout = QtWidgets.QVBoxLayout(central)
-        main_layout.setContentsMargins(6, 6, 6, 6)
-        main_layout.setSpacing(6)
 
-        # Keep the serial controls and the long diagnostics text on separate
-        # rows so the interface adapts to smaller screens and Windows scaling.
-        controls_widget = QtWidgets.QWidget()
-        controls = QtWidgets.QGridLayout(controls_widget)
-        controls.setContentsMargins(0, 0, 0, 0)
-        controls.setHorizontalSpacing(6)
-        controls.setVerticalSpacing(3)
+        controls = QtWidgets.QHBoxLayout()
 
         self.port_combo = QtWidgets.QComboBox()
         self.refresh_ports()
@@ -316,60 +277,37 @@ class CSIViewer(QtWidgets.QMainWindow):
         self.start_serial_button.clicked.connect(self.toggle_serial)
 
         self.status_label = QtWidgets.QLabel("Disconnected")
-        self.status_label.setMinimumWidth(0)
-
         self.stats_label = QtWidgets.QLabel(
             "Packets: 0 | Rate: 0.0 Hz | Queue: 0"
         )
-        self.stats_label.setWordWrap(True)
-        self.stats_label.setMinimumWidth(0)
-        self.stats_label.setSizePolicy(
-            QtWidgets.QSizePolicy.Expanding,
-            QtWidgets.QSizePolicy.Preferred,
-        )
 
-        controls.addWidget(QtWidgets.QLabel("Port"), 0, 0)
-        controls.addWidget(self.port_combo, 0, 1)
-        controls.addWidget(refresh_button, 0, 2)
-        controls.addWidget(QtWidgets.QLabel("Baud"), 0, 3)
-        controls.addWidget(self.baud_input, 0, 4)
-        controls.addWidget(self.start_serial_button, 0, 5)
-        controls.addWidget(self.status_label, 0, 6)
-        controls.setColumnStretch(7, 1)
-        controls.addWidget(self.stats_label, 1, 0, 1, 8)
+        controls.addWidget(QtWidgets.QLabel("Port"))
+        controls.addWidget(self.port_combo)
+        controls.addWidget(refresh_button)
+        controls.addWidget(QtWidgets.QLabel("Baud"))
+        controls.addWidget(self.baud_input)
+        controls.addWidget(self.start_serial_button)
+        controls.addWidget(self.status_label)
+        controls.addStretch()
+        controls.addWidget(self.stats_label)
 
-        main_layout.addWidget(controls_widget)
+        main_layout.addLayout(controls)
 
-        # The left configuration area is scrollable. This prevents controls
-        # from extending below the screen on notebooks or with DPI scaling.
+        grid = QtWidgets.QGridLayout()
+        main_layout.addLayout(grid)
+
         left_panel = QtWidgets.QWidget()
         left_layout = QtWidgets.QVBoxLayout(left_panel)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(6)
 
         self.collection_panel = self._create_collection_panel()
         self.programmed_panel = self._create_programmed_panel()
-        self.realtime_panel = self._create_realtime_panel()
 
         left_layout.addWidget(self.collection_panel)
         left_layout.addWidget(self.programmed_panel)
-        left_layout.addWidget(self.realtime_panel)
         left_layout.addStretch()
 
-        left_scroll = QtWidgets.QScrollArea()
-        left_scroll.setWidgetResizable(True)
-        left_scroll.setHorizontalScrollBarPolicy(
-            QtCore.Qt.ScrollBarAlwaysOff
-        )
-        left_scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
-        left_scroll.setWidget(left_panel)
-        left_scroll.setMinimumWidth(320)
-        left_scroll.setMaximumWidth(440)
-
-        plots_panel = QtWidgets.QWidget()
-        plots_layout = QtWidgets.QVBoxLayout(plots_panel)
-        plots_layout.setContentsMargins(0, 0, 0, 0)
-        plots_layout.setSpacing(6)
+        grid.addWidget(left_panel, 0, 0, 2, 1)
 
         self.waveform_widget = pg.PlotWidget(
             title="CSI Waveform - Multiple Subcarriers"
@@ -398,6 +336,8 @@ class CSIViewer(QtWidgets.QMainWindow):
             )
             self.waveform_curves[subcarrier] = curve
 
+        grid.addWidget(self.waveform_widget, 0, 1)
+
         self.rssi_widget = pg.PlotWidget(title="RSSI Over Time")
         self.rssi_curve = self.rssi_widget.plot(
             pen=pg.mkPen(color=(255, 255, 255), width=1)
@@ -405,18 +345,7 @@ class CSIViewer(QtWidgets.QMainWindow):
         self.rssi_widget.setLabel("left", "RSSI dBm")
         self.rssi_widget.setLabel("bottom", "Packets")
 
-        plots_layout.addWidget(self.waveform_widget, 2)
-        plots_layout.addWidget(self.rssi_widget, 1)
-
-        splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
-        splitter.setChildrenCollapsible(False)
-        splitter.addWidget(left_scroll)
-        splitter.addWidget(plots_panel)
-        splitter.setStretchFactor(0, 0)
-        splitter.setStretchFactor(1, 1)
-        splitter.setSizes([360, 1040])
-
-        main_layout.addWidget(splitter, 1)
+        grid.addWidget(self.rssi_widget, 1, 1)
         self.setCentralWidget(central)
 
     def _create_collection_panel(self) -> QtWidgets.QGroupBox:
@@ -522,13 +451,14 @@ class CSIViewer(QtWidgets.QMainWindow):
         layout.addLayout(form)
 
         order_label = QtWidgets.QLabel(
-            "One programmed run uses the selected quadrant.\n"
-            "Change the quadrant only after the protocol finishes.\n\n"
-            "Order: E-S-M → M-E-S → S-M-E\n"
-            "Voice = next class\n"
-            "Long beep = recording started\n"
-            "Two high beeps = recording ended\n"
-            "F11 = fullscreen | Esc = leave fullscreen"
+            "Rotating order:\n"
+            "E-S-M → M-E-S → S-M-E\n\n"
+            "Audio cues:\n"
+            "1 beep = empty\n"
+            "2 beeps = static presence\n"
+            "3 beeps = movement\n"
+            "1 long beep = recording started\n"
+            "2 high beeps = recording ended"
         )
         order_label.setWordWrap(True)
         layout.addWidget(order_label)
@@ -571,102 +501,6 @@ class CSIViewer(QtWidgets.QMainWindow):
         layout.addWidget(self.program_status_label)
 
         return group
-
-    def _create_realtime_panel(self) -> QtWidgets.QGroupBox:
-        group = QtWidgets.QGroupBox("Short Realtime Simulation")
-        layout = QtWidgets.QVBoxLayout(group)
-
-        self.realtime_scenario_input = QtWidgets.QLineEdit("realtime_test")
-
-        self.realtime_prepare_input = QtWidgets.QDoubleSpinBox()
-        self.realtime_prepare_input.setRange(0, 60)
-        self.realtime_prepare_input.setValue(5)
-        self.realtime_prepare_input.setSuffix(" s")
-
-        self.realtime_state_duration_input = QtWidgets.QDoubleSpinBox()
-        self.realtime_state_duration_input.setRange(5, 300)
-        self.realtime_state_duration_input.setValue(20)
-        self.realtime_state_duration_input.setSuffix(" s")
-
-        self.realtime_transition_input = QtWidgets.QDoubleSpinBox()
-        self.realtime_transition_input.setRange(1, 60)
-        self.realtime_transition_input.setValue(5)
-        self.realtime_transition_input.setSuffix(" s")
-
-        form = QtWidgets.QFormLayout()
-        form.addRow("Scenario", self.realtime_scenario_input)
-        form.addRow("Preparation", self.realtime_prepare_input)
-        form.addRow("State duration", self.realtime_state_duration_input)
-        form.addRow("Transition", self.realtime_transition_input)
-        layout.addLayout(form)
-
-        info = QtWidgets.QLabel(
-            "Fixed sequence, without quadrants:\n"
-            "empty → static → movement → static → movement → empty\n\n"
-            "Transitions are recorded but excluded from metrics.\n"
-            "With 20 s states and 5 s transitions: about 2 min 25 s."
-        )
-        info.setWordWrap(True)
-        layout.addWidget(info)
-
-        self.start_realtime_button = QtWidgets.QPushButton(
-            "Start Short Realtime Test"
-        )
-        self.start_realtime_button.clicked.connect(
-            self.start_realtime_test
-        )
-
-        self.stop_realtime_button = QtWidgets.QPushButton(
-            "Stop and Save Realtime Test"
-        )
-        self.stop_realtime_button.clicked.connect(
-            self.stop_realtime_test
-        )
-        self.stop_realtime_button.setEnabled(False)
-
-        self.realtime_progress = QtWidgets.QProgressBar()
-        self.realtime_progress.setValue(0)
-
-        self.realtime_status_label = QtWidgets.QLabel(
-            "Realtime test idle"
-        )
-        self.realtime_status_label.setWordWrap(True)
-
-        layout.addWidget(self.start_realtime_button)
-        layout.addWidget(self.stop_realtime_button)
-        layout.addWidget(self.realtime_progress)
-        layout.addWidget(self.realtime_status_label)
-
-        return group
-
-    # ================= WINDOW CONTROL =================
-
-    def _configure_window_shortcuts(self) -> None:
-        self.fullscreen_shortcut = QtWidgets.QShortcut(
-            QtGui.QKeySequence("F11"),
-            self,
-        )
-        self.fullscreen_shortcut.activated.connect(
-            self.toggle_fullscreen
-        )
-
-        self.leave_fullscreen_shortcut = QtWidgets.QShortcut(
-            QtGui.QKeySequence("Escape"),
-            self,
-        )
-        self.leave_fullscreen_shortcut.activated.connect(
-            self.leave_fullscreen
-        )
-
-    def toggle_fullscreen(self) -> None:
-        if self.isFullScreen():
-            self.showMaximized()
-        else:
-            self.showFullScreen()
-
-    def leave_fullscreen(self) -> None:
-        if self.isFullScreen():
-            self.showMaximized()
 
     # ================= SERIAL CONTROL =================
 
@@ -718,9 +552,6 @@ class CSIViewer(QtWidgets.QMainWindow):
         if self.programmed_active:
             self.programmed_cancel_requested = True
 
-        if self.realtime_active:
-            self._finish_realtime_test(stopped_early=True)
-
         if self.collection_session_active:
             self.stop_collection()
 
@@ -745,9 +576,9 @@ class CSIViewer(QtWidgets.QMainWindow):
             self.output_dir_input.setText(folder)
 
     def start_collection(self) -> None:
-        if self.programmed_active or self.realtime_active:
+        if self.programmed_active:
             self.collection_status_label.setText(
-                "Finish the active automated collection first."
+                "Finish or cancel the programmed protocol first."
             )
             return
 
@@ -808,7 +639,7 @@ class CSIViewer(QtWidgets.QMainWindow):
         self.stop_collection_button.setEnabled(not programmed)
 
         if programmed:
-            self._speak_class_label(label)
+            self._play_class_beeps(label)
 
         if self.waiting_offset:
             self.collection_status_label.setText(
@@ -926,11 +757,7 @@ class CSIViewer(QtWidgets.QMainWindow):
             )
             return
 
-        if (
-            self.collection_session_active
-            or self.programmed_active
-            or self.realtime_active
-        ):
+        if self.collection_session_active or self.programmed_active:
             return
 
         cycles = int(self.program_cycles_input.value())
@@ -965,7 +792,6 @@ class CSIViewer(QtWidgets.QMainWindow):
 
         self.start_collection_button.setEnabled(False)
         self.stop_collection_button.setEnabled(False)
-        self.start_realtime_button.setEnabled(False)
 
         self._set_program_configuration_enabled(False)
         self._start_next_programmed_item()
@@ -994,17 +820,7 @@ class CSIViewer(QtWidgets.QMainWindow):
         item_number = self.programmed_index + 1
         total = len(self.programmed_plan)
 
-        session = self._sanitize_path_component(
-            self.session_input.text(),
-            fallback="session_01",
-        )
-        quadrant = self._sanitize_path_component(
-            self.quadrant_combo.currentText(),
-            fallback="quad1",
-        )
-
         self.program_status_label.setText(
-            f"{session} | {quadrant} | "
             f"Item {item_number}/{total} | Cycle {cycle} | "
             f"Prepare for: {label}"
         )
@@ -1110,7 +926,6 @@ class CSIViewer(QtWidgets.QMainWindow):
 
         self.start_collection_button.setEnabled(self.running)
         self.stop_collection_button.setEnabled(False)
-        self.start_realtime_button.setEnabled(self.running)
         self._set_program_configuration_enabled(True)
 
         if cancelled:
@@ -1132,438 +947,9 @@ class CSIViewer(QtWidgets.QMainWindow):
         self.program_prepare_input.setEnabled(enabled)
         self.program_duration_input.setEnabled(enabled)
 
-
-    # ================= SHORT REALTIME SIMULATION =================
-
-    def start_realtime_test(self) -> None:
-        if not self.running:
-            self.realtime_status_label.setText(
-                "Start serial before starting the realtime test."
-            )
-            return
-
-        if (
-            self.collection_session_active
-            or self.programmed_active
-            or self.realtime_active
-        ):
-            return
-
-        preparation = float(self.realtime_prepare_input.value())
-        state_duration = float(
-            self.realtime_state_duration_input.value()
-        )
-        transition_duration = float(
-            self.realtime_transition_input.value()
-        )
-
-        self.realtime_session = self._sanitize_path_component(
-            self.session_input.text(),
-            fallback="session_01",
-        )
-        self.realtime_scenario = self._sanitize_path_component(
-            self.realtime_scenario_input.text(),
-            fallback="realtime_test",
-        )
-        self.realtime_output_dir = Path(self.output_dir_input.text())
-
-        start_timestamp = time.time() + preparation
-        cursor = start_timestamp
-        plan: list[dict[str, object]] = []
-
-        for index, (label, include_metrics, spoken_text) in enumerate(
-            REALTIME_TEST_SEQUENCE,
-            start=1,
-        ):
-            duration = (
-                transition_duration
-                if label == "transition"
-                else state_duration
-            )
-            end_timestamp = cursor + duration
-
-            plan.append(
-                {
-                    "segment": index,
-                    "label": label,
-                    "include_in_metrics": include_metrics,
-                    "spoken_text": spoken_text,
-                    "start_timestamp": cursor,
-                    "end_timestamp": end_timestamp,
-                    "duration_seconds": duration,
-                }
-            )
-            cursor = end_timestamp
-
-        self.realtime_plan = plan
-        self.realtime_start_time = start_timestamp
-        self.realtime_total_duration = cursor - start_timestamp
-        self.realtime_index = -1
-        self.realtime_current_label = ""
-        self.realtime_packets = []
-        self.realtime_annotations = []
-        self.realtime_packet_index = 0
-        self.realtime_active = True
-        self.realtime_waiting_preparation = preparation > 0
-        self.realtime_stop_requested = False
-
-        self.realtime_progress.setRange(0, 1000)
-        self.realtime_progress.setValue(0)
-        self.start_realtime_button.setEnabled(False)
-        self.stop_realtime_button.setEnabled(True)
-        self.start_collection_button.setEnabled(False)
-        self.start_program_button.setEnabled(False)
-
-        self._set_program_configuration_enabled(False)
-        self._set_realtime_configuration_enabled(False)
-
-        if preparation > 0:
-            self.realtime_status_label.setText(
-                f"Preparing realtime test: {preparation:.1f} s"
-            )
-        else:
-            self.realtime_status_label.setText(
-                "Realtime test starting..."
-            )
-
-        self._speak_text("Realtime test. Prepare for empty")
-
-    def stop_realtime_test(self) -> None:
-        if not self.realtime_active:
-            return
-
-        self._finish_realtime_test(stopped_early=True)
-
-    def update_realtime_timing(self, now: float) -> None:
-        if not self.realtime_active or self.realtime_start_time is None:
-            return
-
-        if now < self.realtime_start_time:
-            remaining = self.realtime_start_time - now
-            self.realtime_status_label.setText(
-                f"Preparing realtime test: {remaining:.1f} s"
-            )
-            return
-
-        if self.realtime_waiting_preparation:
-            self.realtime_waiting_preparation = False
-            self._play_recording_start_beep()
-
-        final_end = float(
-            self.realtime_plan[-1]["end_timestamp"]
-        )
-
-        if now >= final_end:
-            self._finish_realtime_test(stopped_early=False)
-            return
-
-        new_index = self._realtime_index_for_timestamp(now)
-
-        if new_index is not None and new_index != self.realtime_index:
-            self.realtime_index = new_index
-            item = self.realtime_plan[new_index]
-            self.realtime_current_label = str(item["label"])
-            self._speak_text(str(item["spoken_text"]))
-
-        if self.realtime_index >= 0:
-            item = self.realtime_plan[self.realtime_index]
-            label = str(item["label"])
-            segment = int(item["segment"])
-            total_segments = len(self.realtime_plan)
-            remaining = max(
-                0.0,
-                float(item["end_timestamp"]) - now,
-            )
-
-            self.realtime_status_label.setText(
-                f"Segment {segment}/{total_segments} | "
-                f"{label} | {remaining:.1f} s remaining"
-            )
-
-        elapsed = max(0.0, now - self.realtime_start_time)
-        progress = int(
-            min(
-                1000,
-                (elapsed / self.realtime_total_duration) * 1000,
-            )
-        )
-        self.realtime_progress.setValue(progress)
-
-    def _realtime_index_for_timestamp(
-        self,
-        timestamp: float,
-    ) -> int | None:
-        for index, item in enumerate(self.realtime_plan):
-            start = float(item["start_timestamp"])
-            end = float(item["end_timestamp"])
-
-            if start <= timestamp < end:
-                return index
-
-        return None
-
-    def append_realtime_packet(self, event: dict) -> None:
-        if not self.realtime_active:
-            return
-
-        capture_timestamp = float(
-            event.get("capture_timestamp", event.get("pc_timestamp", 0.0))
-        )
-        segment_index = self._realtime_index_for_timestamp(
-            capture_timestamp
-        )
-
-        if segment_index is None:
-            return
-
-        item = self.realtime_plan[segment_index]
-        metadata = event.get("metadata", {})
-        imag = event.get("imag")
-        real = event.get("real")
-
-        if imag is None or real is None:
-            return
-
-        self.realtime_packet_index += 1
-
-        packet = {
-            "label": str(item["label"]),
-            "pc_timestamp": float(
-                event.get("pc_timestamp", time.time())
-            ),
-            "capture_timestamp": capture_timestamp,
-            "esp_timestamp_us": int(
-                metadata.get("timestamp_us", 0) or 0
-            ),
-            "sequence": int(metadata.get("sequence", 0) or 0),
-            "packet_index": self.realtime_packet_index,
-            "rssi": int(metadata.get("rssi", 0) or 0),
-            "rate": int(metadata.get("rate", 0) or 0),
-            "channel": int(metadata.get("channel", 0) or 0),
-            "csi_len": int(metadata.get("csi_len", 0) or 0),
-            "flags": int(metadata.get("flags", 0) or 0),
-            "imag": [int(value) for value in imag],
-            "real": [int(value) for value in real],
-        }
-
-        self.realtime_packets.append(packet)
-
-    def _finish_realtime_test(self, stopped_early: bool) -> None:
-        if not self.realtime_active:
-            return
-
-        actual_end = time.time()
-        planned_end = float(
-            self.realtime_plan[-1]["end_timestamp"]
-        )
-        effective_end = min(actual_end, planned_end)
-
-        self.realtime_active = False
-        self.realtime_waiting_preparation = False
-        self.realtime_stop_requested = stopped_early
-
-        saved_dir = self._save_realtime_test(
-            effective_end=effective_end,
-            stopped_early=stopped_early,
-        )
-
-        self.start_realtime_button.setEnabled(self.running)
-        self.stop_realtime_button.setEnabled(False)
-        self.start_collection_button.setEnabled(self.running)
-        self.start_program_button.setEnabled(self.running)
-        self._set_program_configuration_enabled(True)
-        self._set_realtime_configuration_enabled(True)
-
-        self.realtime_progress.setValue(1000)
-        self._play_recording_end_beep()
-
-        if saved_dir is None:
-            self.realtime_status_label.setText(
-                "Realtime test finished without packets."
-            )
-        else:
-            status = "stopped early" if stopped_early else "completed"
-            self.realtime_status_label.setText(
-                f"Realtime test {status}: "
-                f"{len(self.realtime_packets)} packets\n"
-                f"{saved_dir}"
-            )
-
-    def _save_realtime_test(
-        self,
-        effective_end: float,
-        stopped_early: bool,
-    ) -> Path | None:
-        if not self.realtime_packets:
-            return None
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        run_name = f"{self.realtime_scenario}_{timestamp}"
-        run_dir = (
-            self.realtime_output_dir
-            / "realtime_tests"
-            / self.realtime_session
-            / run_name
-        )
-        run_dir.mkdir(parents=True, exist_ok=True)
-
-        bin_path = run_dir / f"{run_name}.bin"
-        annotations_path = run_dir / "annotations.csv"
-        metadata_path = run_dir / "metadata.json"
-
-        write_packets(bin_path, self.realtime_packets)
-
-        annotation_rows: list[dict[str, object]] = []
-
-        for item in self.realtime_plan:
-            start = float(item["start_timestamp"])
-
-            if start >= effective_end:
-                break
-
-            end = min(
-                float(item["end_timestamp"]),
-                effective_end,
-            )
-
-            annotation_rows.append(
-                {
-                    "segment": int(item["segment"]),
-                    "label": str(item["label"]),
-                    "include_in_metrics": bool(
-                        item["include_in_metrics"]
-                    ),
-                    "start_offset_seconds": (
-                        start - float(self.realtime_start_time)
-                    ),
-                    "end_offset_seconds": (
-                        end - float(self.realtime_start_time)
-                    ),
-                    "duration_seconds": end - start,
-                    "start_timestamp": start,
-                    "end_timestamp": end,
-                }
-            )
-
-        with annotations_path.open(
-            "w",
-            newline="",
-            encoding="utf-8",
-        ) as csv_file:
-            writer = csv.DictWriter(
-                csv_file,
-                fieldnames=[
-                    "segment",
-                    "label",
-                    "include_in_metrics",
-                    "start_offset_seconds",
-                    "end_offset_seconds",
-                    "duration_seconds",
-                    "start_timestamp",
-                    "end_timestamp",
-                ],
-            )
-            writer.writeheader()
-            writer.writerows(annotation_rows)
-
-        metadata = {
-            "scenario": self.realtime_scenario,
-            "session": self.realtime_session,
-            "quadrant_scope": "not_applicable",
-            "stopped_early": stopped_early,
-            "packet_count": len(self.realtime_packets),
-            "planned_duration_seconds": self.realtime_total_duration,
-            "recorded_duration_seconds": (
-                effective_end - float(self.realtime_start_time)
-            ),
-            "state_sequence": [
-                str(item["label"])
-                for item in self.realtime_plan
-            ],
-            "binary_file": bin_path.name,
-            "annotations_file": annotations_path.name,
-        }
-
-        metadata_path.write_text(
-            json.dumps(metadata, indent=2),
-            encoding="utf-8",
-        )
-
-        print(f"Realtime BIN saved at: {bin_path}")
-        return run_dir
-
-    def _set_realtime_configuration_enabled(
-        self,
-        enabled: bool,
-    ) -> None:
-        self.realtime_scenario_input.setEnabled(enabled)
-        self.realtime_prepare_input.setEnabled(enabled)
-        self.realtime_state_duration_input.setEnabled(enabled)
-        self.realtime_transition_input.setEnabled(enabled)
-
     # ================= AUDIO CUES =================
 
-    def _speak_class_label(self, label: str) -> None:
-        spoken_text = CLASS_SPOKEN_NAMES.get(label, label)
-        self._speak_text(spoken_text, fallback_label=label)
-
-    def _speak_text(
-        self,
-        spoken_text: str,
-        fallback_label: str | None = None,
-    ) -> None:
-        def fallback() -> None:
-            if fallback_label is not None:
-                self._play_class_beep_fallback(fallback_label)
-            else:
-                QtWidgets.QApplication.beep()
-
-        def worker() -> None:
-            if sys.platform != "win32":
-                fallback()
-                return
-
-            escaped_text = spoken_text.replace("'", "''")
-            powershell_script = (
-                "Add-Type -AssemblyName System.Speech; "
-                "$speaker = New-Object "
-                "System.Speech.Synthesis.SpeechSynthesizer; "
-                "$speaker.Rate = -1; "
-                "$speaker.Volume = 100; "
-                f"$speaker.Speak('{escaped_text}'); "
-                "$speaker.Dispose();"
-            )
-
-            try:
-                completed = subprocess.run(
-                    [
-                        "powershell.exe",
-                        "-NoProfile",
-                        "-NonInteractive",
-                        "-ExecutionPolicy",
-                        "Bypass",
-                        "-Command",
-                        powershell_script,
-                    ],
-                    check=False,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    creationflags=getattr(
-                        subprocess,
-                        "CREATE_NO_WINDOW",
-                        0,
-                    ),
-                )
-
-                if completed.returncode != 0:
-                    fallback()
-
-            except (OSError, subprocess.SubprocessError):
-                fallback()
-
-        threading.Thread(target=worker, daemon=True).start()
-
-    def _play_class_beep_fallback(self, label: str) -> None:
+    def _play_class_beeps(self, label: str) -> None:
         count = CLASS_BEEP_COUNTS.get(label, 1)
         pattern = [(750, 180, 160)] * count
         self._play_beep_pattern(pattern)
@@ -1661,9 +1047,7 @@ class CSIViewer(QtWidgets.QMainWindow):
         if new_packets > 0:
             self.update_plots()
 
-        current_time = time.time()
-        self.update_realtime_timing(current_time)
-        self._check_collection_finalization(current_time)
+        self._check_collection_finalization(time.time())
         self._check_reader_status()
         self.update_stats_label()
 
@@ -1696,9 +1080,6 @@ class CSIViewer(QtWidgets.QMainWindow):
 
         if self._event_belongs_to_collection(event):
             self.append_collection_packet(event)
-
-        if self.realtime_active:
-            self.append_realtime_packet(event)
 
         return True
 

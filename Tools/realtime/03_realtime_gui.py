@@ -40,6 +40,10 @@ from realtime.realtime_inference_engine import (  # noqa: E402
 
 DEFAULT_BAUD = 921600
 DEFAULT_START_DELAY_SECONDS = 10
+DEFAULT_CALIBRATION_SECONDS = 8
+DEFAULT_CALIBRATION_MIN_WINDOWS = 5
+DEFAULT_CALIBRATION_EMPTY_RATIO = 0.60
+DEFAULT_CALIBRATION_EMPTY_PROBABILITY = 0.55
 DEFAULT_OUTPUT_ROOT = TOOLS_DIR / "datasets" / "realtime_runs"
 EVENT_QUEUE_MAX_SIZE = 5000
 MAX_EVENTS_PER_UPDATE = 500
@@ -168,6 +172,7 @@ class RunRecorder:
         self.predictions_path = self.run_dir / "realtime_predictions.csv"
         self.raw_path = self.run_dir / "raw_stream.bin"
         self.metadata_path = self.run_dir / "metadata.json"
+        self.calibration_path = self.run_dir / "calibration.json"
         self.save_raw = save_raw
         self.raw_packets: list[dict[str, Any]] = []
         self.started_at = time.time()
@@ -190,6 +195,12 @@ class RunRecorder:
         self._writer.writerow(row)
         self._file.flush()
         self.prediction_count += 1
+
+    def save_calibration(self, summary: Mapping[str, Any]) -> None:
+        self.calibration_path.write_text(
+            json.dumps(dict(summary), indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
 
     def finalize(
         self,
@@ -224,6 +235,11 @@ class RunRecorder:
             "serial_diagnostics": dict(serial_diagnostics),
             "engine_diagnostics": dict(engine_diagnostics),
             "artifact_paths": dict(artifacts),
+            "calibration_file": (
+                str(self.calibration_path)
+                if self.calibration_path.exists()
+                else ""
+            ),
         }
         self.metadata_path.write_text(
             json.dumps(metadata, indent=2, ensure_ascii=False),
@@ -247,6 +263,11 @@ class RealtimeWindow(QtWidgets.QMainWindow):
         self.start_delay_remaining = 0
         self.last_result: RealtimeInferenceResult | None = None
         self.latest_esp_stats: dict[str, Any] = {}
+
+        self.phase = "idle"
+        self.calibration_started_at: float | None = None
+        self.calibration_results: list[RealtimeInferenceResult] = []
+        self.calibration_summary: dict[str, Any] = {}
 
         self.countdown_timer = QtCore.QTimer(self)
         self.countdown_timer.setInterval(1000)
@@ -292,6 +313,21 @@ class RealtimeWindow(QtWidgets.QMainWindow):
         self.raw_checkbox = QtWidgets.QCheckBox("Salvar fluxo CSI bruto")
         self.raw_checkbox.setChecked(True)
 
+        self.calibration_checkbox = QtWidgets.QCheckBox(
+            "Calibrar automaticamente com o ambiente vazio"
+        )
+        self.calibration_checkbox.setChecked(True)
+
+        self.calibration_seconds_spin = QtWidgets.QSpinBox()
+        self.calibration_seconds_spin.setRange(3, 60)
+        self.calibration_seconds_spin.setValue(
+            int(self.args.calibration_seconds)
+        )
+        self.calibration_seconds_spin.setSuffix(" s")
+        self.calibration_seconds_spin.setToolTip(
+            "Período avaliado após o preenchimento do buffer inicial."
+        )
+
         self.start_delay_spin = QtWidgets.QSpinBox()
         self.start_delay_spin.setRange(0, 300)
         self.start_delay_spin.setValue(int(self.args.start_delay))
@@ -320,6 +356,9 @@ class RealtimeWindow(QtWidgets.QMainWindow):
         grid.addWidget(QtWidgets.QLabel("Estado real:"), 1, 5)
         grid.addWidget(self.truth_combo, 1, 6)
         grid.addWidget(self.raw_checkbox, 2, 0, 1, 2)
+        grid.addWidget(self.calibration_checkbox, 2, 2, 1, 3)
+        grid.addWidget(QtWidgets.QLabel("Duração:"), 2, 5)
+        grid.addWidget(self.calibration_seconds_spin, 2, 6)
         layout.addWidget(controls)
 
         states = QtWidgets.QHBoxLayout()
@@ -450,6 +489,8 @@ class RealtimeWindow(QtWidgets.QMainWindow):
         self.refresh_button.setEnabled(not locked)
         self.raw_checkbox.setEnabled(not locked)
         self.start_delay_spin.setEnabled(not locked)
+        self.calibration_checkbox.setEnabled(not locked)
+        self.calibration_seconds_spin.setEnabled(not locked)
 
     def start_monitoring(self) -> None:
         if self.running or self.start_pending:
@@ -494,7 +535,11 @@ class RealtimeWindow(QtWidgets.QMainWindow):
             self.start_delay_spin.value()
         )
         self.start_pending = True
+        self.phase = "countdown"
         self.last_result = None
+        self.calibration_started_at = None
+        self.calibration_results.clear()
+        self.calibration_summary = {}
         self.latest_esp_stats = {}
 
         self._set_controls_locked(True)
@@ -595,14 +640,11 @@ class RealtimeWindow(QtWidgets.QMainWindow):
         self.output_label.setText(
             f"Saída: {self.recorder.run_dir}"
         )
-        self.reason_label.setText(
-            "Preenchendo o buffer inicial"
-        )
-
-        if self.tts_checkbox.isChecked():
-            self.speech.speak(
-                "empty",
-                "Sistema iniciado. Ambiente vazio.",
+        if self.calibration_checkbox.isChecked():
+            self._start_calibration()
+        else:
+            self._start_normal_monitoring(
+                announcement="Sistema iniciado."
             )
 
     def _cancel_pending_start(
@@ -613,6 +655,9 @@ class RealtimeWindow(QtWidgets.QMainWindow):
         self.start_pending = False
         self.start_delay_remaining = 0
         self.pending_port = ""
+        self.phase = "idle"
+        self.calibration_started_at = None
+        self.calibration_results.clear()
         self.engine = None
         self.recorder = None
         self.reader = None
@@ -637,8 +682,8 @@ class RealtimeWindow(QtWidgets.QMainWindow):
             try:
                 self.reader.stop()
             except (serial.SerialException, OSError, AttributeError):
-                # O pyserial no Windows pode tentar fechar duas vezes
-                # o mesmo identificador durante o encerramento.
+                # PySerial on Windows can race with the reader thread while
+                # releasing an OVERLAPPED handle. Finalization must continue.
                 pass
 
         serial_diag = (
@@ -693,6 +738,9 @@ class RealtimeWindow(QtWidgets.QMainWindow):
         self.engine = None
         self.recorder = None
         self.pending_port = ""
+        self.phase = "idle"
+        self.calibration_started_at = None
+        self.calibration_results.clear()
 
         self.connection_label.setText("Desconectado")
         self.reason_label.setText("Aquisição encerrada")
@@ -729,15 +777,220 @@ class RealtimeWindow(QtWidgets.QMainWindow):
         truth = self.current_truth()
         if self.recorder is not None:
             self.recorder.append_packet(packet, truth)
+
         result = self.engine.push_packet(packet)
         if result is None:
             return
+
+        if self.phase == "calibrating":
+            self._process_calibration_result(result)
+            return
+
+        if self.phase != "monitoring":
+            return
+
         self.last_result = result
         if self.recorder is not None:
             self.recorder.append_result(result, truth)
         self._display_result(result, truth)
         if result.should_announce and self.tts_checkbox.isChecked():
-            self.speech.speak(result.stable_state, STATE_SPEECH.get(result.stable_state, result.stable_state))
+            self.speech.speak(
+                result.stable_state,
+                STATE_SPEECH.get(
+                    result.stable_state,
+                    result.stable_state,
+                ),
+            )
+
+    def _show_phase(self, title: str, reason: str) -> None:
+        self.stable_label.setText(title)
+        self.stable_label.setStyleSheet(
+            "background:#ECEFF3;color:#263746;"
+            "border:2px solid #8795A1;border-radius:12px;"
+            "padding:18px;"
+        )
+        self.reason_label.setText(reason)
+
+    def _start_calibration(self) -> None:
+        if self.engine is None:
+            return
+
+        self.phase = "calibrating"
+        self.calibration_started_at = None
+        self.calibration_results.clear()
+        self.calibration_summary = {}
+        self._show_phase(
+            "CALIBRANDO",
+            "Preenchendo o buffer. Mantenha o ambiente vazio.",
+        )
+        self.raw_label.setText("—")
+        self.confidence_label.setText("Confiança: —")
+
+        if self.tts_checkbox.isChecked():
+            self.speech.speak(
+                "empty",
+                "Calibração iniciada. Mantenha o ambiente vazio.",
+            )
+
+    def _process_calibration_result(
+        self,
+        result: RealtimeInferenceResult,
+    ) -> None:
+        if self.calibration_started_at is None:
+            self.calibration_started_at = time.time()
+
+        self.calibration_results.append(result)
+        self.raw_label.setText(
+            STATE_NAMES.get(result.raw_state, result.raw_state)
+        )
+        self.confidence_label.setText(
+            f"Confiança: {result.raw_confidence * 100:.1f}%"
+        )
+
+        probabilities = {
+            "empty": result.probability_empty,
+            "static_presence": result.probability_static_presence,
+            "movement": result.probability_movement,
+        }
+        for state, probability in probabilities.items():
+            self.bars[state].setValue(
+                int(round(probability * 1000))
+            )
+            self.percent_labels[state].setText(
+                f"{probability * 100:.1f}%"
+            )
+
+        elapsed = time.time() - self.calibration_started_at
+        duration = float(self.calibration_seconds_spin.value())
+        remaining = max(0.0, duration - elapsed)
+
+        self._show_phase(
+            "CALIBRANDO",
+            (
+                f"Ambiente vazio: {len(self.calibration_results)} "
+                f"janelas avaliadas | faltam {remaining:.1f} s"
+            ),
+        )
+
+        if (
+            elapsed >= duration
+            and len(self.calibration_results)
+            >= DEFAULT_CALIBRATION_MIN_WINDOWS
+        ):
+            self._finish_calibration()
+
+    def _finish_calibration(self) -> None:
+        if self.engine is None or not self.calibration_results:
+            return
+
+        results = list(self.calibration_results)
+        empty_count = sum(
+            result.raw_state == "empty"
+            for result in results
+        )
+        empty_ratio = empty_count / len(results)
+        mean_empty_probability = sum(
+            result.probability_empty
+            for result in results
+        ) / len(results)
+        packet_rate = self.engine.diagnostics().packet_rate_hz
+
+        approved = (
+            empty_ratio >= DEFAULT_CALIBRATION_EMPTY_RATIO
+            or mean_empty_probability
+            >= DEFAULT_CALIBRATION_EMPTY_PROBABILITY
+        )
+
+        self.calibration_summary = {
+            "approved": approved,
+            "completed_at_unix": time.time(),
+            "evaluated_windows": len(results),
+            "empty_windows": empty_count,
+            "empty_ratio": empty_ratio,
+            "mean_empty_probability": mean_empty_probability,
+            "packet_rate_hz": packet_rate,
+            "required_empty_ratio": (
+                DEFAULT_CALIBRATION_EMPTY_RATIO
+            ),
+            "required_mean_empty_probability": (
+                DEFAULT_CALIBRATION_EMPTY_PROBABILITY
+            ),
+        }
+
+        if self.recorder is not None:
+            self.recorder.save_calibration(
+                self.calibration_summary
+            )
+
+        if approved:
+            self._start_normal_monitoring(
+                announcement=(
+                    "Calibração concluída. "
+                    "Monitoramento iniciado."
+                )
+            )
+            return
+
+        message = QtWidgets.QMessageBox(self)
+        message.setWindowTitle("Calibração não aprovada")
+        message.setIcon(QtWidgets.QMessageBox.Warning)
+        message.setText(
+            "O ambiente não foi reconhecido como vazio."
+        )
+        message.setInformativeText(
+            f"Janelas vazias: {empty_count}/{len(results)} "
+            f"({empty_ratio * 100:.1f}%)\n"
+            f"Probabilidade média de vazio: "
+            f"{mean_empty_probability * 100:.1f}%\n"
+            f"Taxa de pacotes: {packet_rate:.1f} Hz"
+        )
+
+        retry_button = message.addButton(
+            "Repetir calibração",
+            QtWidgets.QMessageBox.AcceptRole,
+        )
+        continue_button = message.addButton(
+            "Iniciar mesmo assim",
+            QtWidgets.QMessageBox.DestructiveRole,
+        )
+        cancel_button = message.addButton(
+            "Cancelar",
+            QtWidgets.QMessageBox.RejectRole,
+        )
+        message.exec_()
+
+        clicked = message.clickedButton()
+        if clicked is retry_button:
+            self.engine.reset()
+            self._start_calibration()
+        elif clicked is continue_button:
+            self._start_normal_monitoring(
+                announcement=(
+                    "Monitoramento iniciado sem aprovação "
+                    "da calibração."
+                )
+            )
+        elif clicked is cancel_button:
+            self.stop_monitoring()
+
+    def _start_normal_monitoring(
+        self,
+        announcement: str,
+    ) -> None:
+        if self.engine is None:
+            return
+
+        # Calibration predictions never enter operational decisions.
+        self.engine.reset()
+        self.phase = "monitoring"
+        self.last_result = None
+        self._show_phase(
+            "INICIANDO",
+            "Preenchendo o buffer do monitoramento.",
+        )
+
+        if self.tts_checkbox.isChecked():
+            self.speech.speak("empty", announcement)
 
     def _display_result(self, result: RealtimeInferenceResult, truth: str) -> None:
         self._show_stable_state(result.stable_state)
@@ -799,7 +1052,15 @@ class RealtimeWindow(QtWidgets.QMainWindow):
         )
         self.error_label.setText(f"Erros: {errors}")
         if self.running and self.reader is not None:
-            self.connection_label.setText("Conectado" if self.reader.running else "Conexão encerrada")
+            if not self.reader.running:
+                status = "Conexão encerrada"
+            elif self.phase == "calibrating":
+                status = "Conectado — calibrando"
+            elif self.phase == "monitoring":
+                status = "Conectado — monitorando"
+            else:
+                status = "Conectado"
+            self.connection_label.setText(status)
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         self.stop_monitoring()
@@ -818,6 +1079,12 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Atraso em segundos entre pressionar Iniciar e abrir a serial."
         ),
+    )
+    parser.add_argument(
+        "--calibration-seconds",
+        type=int,
+        default=DEFAULT_CALIBRATION_SECONDS,
+        help="Duração da calibração automática do ambiente vazio.",
     )
     parser.add_argument("--pipeline-config", type=Path)
     parser.add_argument("--model", type=Path)
@@ -864,7 +1131,7 @@ def main() -> None:
     args.output_root.mkdir(parents=True, exist_ok=True)
     app = QtWidgets.QApplication(sys.argv)
     window = RealtimeWindow(args)
-    window.show()
+    window.showFullScreen()
     sys.exit(app.exec_())
 
 
