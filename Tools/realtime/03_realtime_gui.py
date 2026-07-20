@@ -264,6 +264,7 @@ class RealtimeWindow(QtWidgets.QMainWindow):
         self.last_result: RealtimeInferenceResult | None = None
         self.latest_esp_stats: dict[str, Any] = {}
 
+        self.start_mode = getattr(args, "start_mode", "monitoring")
         self.phase = "idle"
         self.calibration_started_at: float | None = None
         self.calibration_results: list[RealtimeInferenceResult] = []
@@ -356,9 +357,6 @@ class RealtimeWindow(QtWidgets.QMainWindow):
         grid.addWidget(QtWidgets.QLabel("Estado real:"), 1, 5)
         grid.addWidget(self.truth_combo, 1, 6)
         grid.addWidget(self.raw_checkbox, 2, 0, 1, 2)
-        grid.addWidget(self.calibration_checkbox, 2, 2, 1, 3)
-        grid.addWidget(QtWidgets.QLabel("Duração:"), 2, 5)
-        grid.addWidget(self.calibration_seconds_spin, 2, 6)
         layout.addWidget(controls)
 
         states = QtWidgets.QHBoxLayout()
@@ -561,7 +559,7 @@ class RealtimeWindow(QtWidgets.QMainWindow):
             f"Início em {self.start_delay_remaining} s"
         )
         self.reason_label.setText(
-            "Contagem regressiva: saia do ambiente e deixe-o vazio."
+            "Contagem regressiva: prepare o ambiente para o monitoramento."
         )
         self.output_label.setText(
             "Saída: será criada quando a aquisição começar"
@@ -571,8 +569,7 @@ class RealtimeWindow(QtWidgets.QMainWindow):
             self.speech.speak(
                 "empty",
                 (
-                    f"Início em {self.start_delay_remaining} segundos. "
-                    "Deixe o ambiente vazio."
+                    f"Início em {self.start_delay_remaining} segundos."
                 ),
             )
 
@@ -590,7 +587,7 @@ class RealtimeWindow(QtWidgets.QMainWindow):
                 f"Início em {self.start_delay_remaining} s"
             )
             self.reason_label.setText(
-                "Contagem regressiva: saia do ambiente e deixe-o vazio."
+                "Contagem regressiva: prepare o ambiente para o monitoramento."
             )
             return
 
@@ -640,7 +637,7 @@ class RealtimeWindow(QtWidgets.QMainWindow):
         self.output_label.setText(
             f"Saída: {self.recorder.run_dir}"
         )
-        if self.calibration_checkbox.isChecked():
+        if self.start_mode == "calibration":
             self._start_calibration()
         else:
             self._start_normal_monitoring(

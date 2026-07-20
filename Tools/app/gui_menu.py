@@ -280,10 +280,18 @@ class MenuWindow(QtWidgets.QMainWindow):
         realtime = self._menu_card(
             "Detecção Realtime",
             (
-                "Calibração automática, classificação, "
+                "Classificação com os parâmetros exportados, "
                 "máquina de estados, gravação e voz."
             ),
             self.open_realtime,
+        )
+        calibration = self._menu_card(
+            "Calibração opcional",
+            (
+                "Registra a resposta do modelo a uma referência "
+                "sem alterar os parâmetros treinados."
+            ),
+            self.open_calibration,
         )
         training = self._menu_card(
             "Treinar Modelo",
@@ -304,8 +312,9 @@ class MenuWindow(QtWidgets.QMainWindow):
 
         cards.addWidget(acquisition, 0, 0)
         cards.addWidget(realtime, 0, 1)
-        cards.addWidget(training, 1, 0)
-        cards.addWidget(results, 1, 1)
+        cards.addWidget(calibration, 1, 0)
+        cards.addWidget(training, 1, 1)
+        cards.addWidget(results, 2, 0, 1, 2)
         root.addLayout(cards, 1)
 
         footer = QtWidgets.QHBoxLayout()
@@ -367,7 +376,7 @@ class MenuWindow(QtWidgets.QMainWindow):
     ) -> QtWidgets.QFrame:
         frame = QtWidgets.QFrame()
         frame.setObjectName("menuCard")
-        frame.setMinimumSize(420, 210)
+        frame.setMinimumSize(380, 145)
 
         layout = QtWidgets.QVBoxLayout(frame)
         layout.setContentsMargins(26, 24, 26, 24)
@@ -517,6 +526,7 @@ class MenuWindow(QtWidgets.QMainWindow):
                 baud=921600,
                 start_delay=10,
                 calibration_seconds=8,
+                start_mode="monitoring",
                 pipeline_config=PIPELINE_CONFIG_PATH,
                 model=MODEL_PATH,
                 state_machine_config=STATE_MACHINE_CONFIG_PATH,
@@ -538,6 +548,60 @@ class MenuWindow(QtWidgets.QMainWindow):
             return
 
         self._show_child(window, "Detecção Realtime")
+
+    def open_calibration(self) -> None:
+        missing = [
+            path
+            for path in (
+                MODEL_PATH,
+                PIPELINE_CONFIG_PATH,
+                STATE_MACHINE_CONFIG_PATH,
+            )
+            if not path.exists()
+        ]
+        if missing:
+            QtWidgets.QMessageBox.critical(
+                self,
+                "Artefatos ausentes",
+                "Arquivos necessários não encontrados:\n\n"
+                + "\n".join(str(path) for path in missing),
+            )
+            return
+
+        try:
+            module = importlib.import_module(
+                "Tools.app.calibration_gui"
+            )
+            args = argparse.Namespace(
+                port="COM4",
+                baud=921600,
+                start_delay=10,
+                calibration_seconds=8,
+                start_mode="calibration",
+                pipeline_config=PIPELINE_CONFIG_PATH,
+                model=MODEL_PATH,
+                state_machine_config=STATE_MACHINE_CONFIG_PATH,
+                output_root=REALTIME_RUNS_PATH,
+                skip_hash_check=False,
+                no_tts=False,
+                check_artifacts=False,
+            )
+            REALTIME_RUNS_PATH.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+            window = module.CalibrationWindow(args)
+        except Exception as exc:
+            self._show_error(
+                "Não foi possível abrir a calibração opcional.",
+                exc,
+            )
+            return
+
+        self._show_child(
+            window,
+            "Calibração opcional",
+        )
 
     def open_training(self) -> None:
         self._show_child(
@@ -583,6 +647,10 @@ class MenuWindow(QtWidgets.QMainWindow):
             (
                 "GUI realtime",
                 TOOLS_DIR / "realtime/03_realtime_gui.py",
+            ),
+            (
+                "Calibração opcional",
+                TOOLS_DIR / "app/calibration_gui.py",
             ),
         ):
             checks.append(
