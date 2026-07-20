@@ -1,13 +1,11 @@
 # STA_CSI_receiver
 
-Firmware do ESP32-S3 que se conecta ao `AP_controller`, recebe o tráfego UDP e captura os dados CSI associados aos quadros unicast controlados.
-
-A implementação atual não imprime o vetor CSI como texto. Os dados são enviados em um protocolo binário chamado **CSI2**, a **921600 baud**, para reduzir a carga da callback e sustentar aproximadamente 50 amostras por segundo.
+Firmware do ESP32-S3 que se conecta ao `AP_controller`, recebe o tráfego UDP e captura o CSI associado aos quadros controlados.
 
 ## Fluxo interno
 
 ```text
-Wi-Fi STA conecta ao AP
+STA conecta ao AP
     ↓
 power saving desabilitado
     ↓
@@ -17,36 +15,36 @@ CSI habilitado
     ↓
 callback recebe um quadro válido
     ↓
-filtro AP → STA
+filtro AP para STA
     ↓
-cópia imediata para fila FreeRTOS
+cópia para fila FreeRTOS
     ↓
-tarefa de saída serializa o frame
+tarefa serializa o frame
     ↓
 UART0 a 921600 baud
     ↓
-parser Python CSI2
+parser CSI2 no computador
 ```
 
 ## Componentes
 
-| Componente | Responsabilidade |
+| Arquivo | Responsabilidade |
 |---|---|
-| `wifi_manager.c` | conexão ao AP, eventos Wi-Fi e desativação de power saving |
-| `udp_receiver.c` | recepção dos pacotes destinados à porta UDP |
-| `csi_manager.c` | filtro, fila, protocolo CSI2, UART e estatísticas |
-| `main.c` | inicialização geral do firmware |
+| `wifi_manager.c` | conexão ao AP, eventos Wi-Fi e configuração de energia |
+| `udp_receiver.c` | recepção dos pacotes UDP |
+| `csi_manager.c` | filtro dos quadros, fila, CSI2, UART e estatísticas |
+| `main.c` | inicialização geral |
 
 ## Callback CSI
 
-A callback roda no contexto da tarefa Wi-Fi. Por isso ela executa apenas operações curtas:
+A callback executa no contexto da pilha Wi-Fi e deve permanecer curta. Ela:
 
-1. valida ponteiros e tamanho;
-2. aceita somente quadros cujo MAC de origem é o BSSID do AP e cujo destino é o próprio STA;
-3. copia os metadados e o buffer CSI para uma estrutura local;
+1. valida os ponteiros e o tamanho;
+2. aceita apenas quadros com origem no BSSID do AP e destino no STA;
+3. copia os metadados e o vetor CSI para uma estrutura local;
 4. tenta inserir a estrutura em uma fila FreeRTOS sem bloqueio.
 
-A conversão para bytes e a escrita na UART são realizadas por uma tarefa separada. Isso evita o gargalo provocado pela antiga impressão textual de centenas de valores com `printf`.
+A conversão para bytes e a escrita na UART são executadas por outra tarefa. Essa separação evita bloquear a recepção Wi-Fi.
 
 ## Configuração atual
 
@@ -58,10 +56,10 @@ A conversão para bytes e a escrita na UART são realizadas por uma tarefa separ
 | Buffer TX UART | 16384 bytes |
 | Capacidade máxima CSI | 384 inteiros |
 | Fila CSI | 64 amostras |
-| Intervalo das estatísticas | 1 s |
-| Power saving | desabilitado (`WIFI_PS_NONE`) |
+| Estatísticas | aproximadamente 1 s |
+| Power saving | `WIFI_PS_NONE` |
 
-Com o AP em HT20, o valor esperado atualmente é:
+Com AP em HT20:
 
 ```text
 csi_len = 256
@@ -69,11 +67,11 @@ num_subcarriers = 128
 bandwidth = 20 MHz
 ```
 
-O MCS pode variar, por exemplo entre 6 e 7, sem alterar o tamanho do vetor.
+O MCS pode variar sem modificar necessariamente o tamanho do vetor.
 
-## Protocolo serial CSI2
+## Protocolo CSI2
 
-Todos os frames usam little-endian.
+Todos os campos numéricos usam little-endian.
 
 ### Cabeçalho comum
 
@@ -82,11 +80,9 @@ Todos os frames usam little-endian.
 | Magic | 4 bytes | `CSI2` |
 | Versão | 1 byte | atualmente `1` |
 | Tipo | 1 byte | `1` para amostra, `2` para estatísticas |
-| Tamanho do frame | 2 bytes | inclui cabeçalho, payload e CRC |
+| Tamanho | 2 bytes | frame completo |
 
 ### Frame de amostra
-
-Após o cabeçalho comum:
 
 | Campo | Tamanho |
 |---|---:|
@@ -100,45 +96,46 @@ Após o cabeçalho comum:
 | CSI bruto | `csi_len` bytes `int8` |
 | CRC-16/CCITT-FALSE | 2 bytes |
 
-O vetor CSI bruto é intercalado como:
+O vetor bruto é intercalado:
 
 ```text
 imag0, real0, imag1, real1, ...
 ```
 
-### Bits de `flags`
+### Flags
 
 | Bits | Conteúdo |
 |---|---|
-| 0 | largura: 0 = 20 MHz, 1 = 40 MHz |
-| 1–2 | `sig_mode` |
+| 0 | largura de banda |
+| 1 e 2 | `sig_mode` |
 | 3 | STBC |
 | 4 | primeiro valor CSI inválido |
-| 5–7 | MCS, três bits menos significativos |
+| 5 a 7 | bits menos significativos do MCS |
 
-### Frame de estatísticas
+### Estatísticas
 
-Enviado aproximadamente uma vez por segundo, contém:
+O frame periódico de estatísticas informa:
 
 - amostras recebidas;
-- amostras inseridas na fila;
+- amostras colocadas na fila;
 - amostras serializadas;
 - descartes por fila cheia;
 - frames inválidos;
-- frames maiores que o limite;
-- quantidade pendente na fila.
+- frames acima do limite;
+- itens pendentes na fila.
 
-A GUI usa essas informações para exibir `ESP drops` e `ESP pending`.
+A aplicação usa esses valores para exibir `ESP drops` e `ESP pending`.
 
-## Integridade do transporte
+## Integridade
 
-O CRC cobre o frame a partir do campo de versão; a magic `CSI2` fica fora do cálculo. O parser no computador:
+O parser do computador:
 
-- procura a magic mesmo quando existem logs textuais misturados;
+- procura a magic `CSI2`;
 - valida versão e tamanho;
-- valida o CRC;
-- detecta saltos no campo `sequence`;
-- se recupera de bytes corrompidos procurando o próximo frame válido.
+- verifica CRC;
+- detecta saltos de sequência;
+- recupera a sincronização após bytes inválidos;
+- separa automaticamente os pares imaginário e real.
 
 ## Compilar e gravar
 
@@ -150,33 +147,27 @@ idf.py build
 idf.py -p COM4 flash
 ```
 
-A porta `COM4` é apenas o exemplo usado no ambiente de desenvolvimento.
+A porta `COM4` é apenas um exemplo. SSID e senha devem coincidir com o AP.
 
-O SSID e a senha devem coincidir com o AP. O canal é definido pelo AP durante a associação.
+## Uso da serial
 
-## Uso da porta serial
+Durante a inicialização podem aparecer logs textuais. Depois que o CSI é habilitado, a UART passa a transportar frames binários.
 
-Durante a inicialização podem aparecer logs textuais. Depois que o CSI é habilitado, a UART passa a transportar frames binários a 921600 baud.
-
-Portanto:
-
-- use `idf.py monitor` somente para diagnóstico de inicialização;
-- feche o monitor antes de abrir a GUI;
-- não tente interpretar o fluxo CSI como texto;
-- use `Tools/acquisition/gui/csi_viewer.py` para aquisição normal.
+- use `idf.py monitor` apenas para diagnóstico de inicialização;
+- feche o monitor antes de abrir a aplicação;
+- não interprete o fluxo CSI como texto;
+- utilize o menu principal do projeto para aquisição ou realtime.
 
 ## Resultado esperado
 
-Em uma coleta de 5 segundos com o AP saudável:
+Em uma coleta de 5 segundos:
 
 ```text
-aproximadamente 240–260 amostras
-48–52 Hz
+240 a 260 amostras
+48 a 52 Hz
 Sequence gaps: 0
 CRC: 0
 ESP drops: 0
 csi_len: 256
 bandwidth: 20 MHz
 ```
-
-A ausência de saltos de sequência comprova que os frames aceitos pela callback chegaram ao computador sem perdas detectadas no caminho monitorado.

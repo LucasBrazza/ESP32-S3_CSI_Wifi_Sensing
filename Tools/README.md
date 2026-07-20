@@ -1,235 +1,175 @@
 # Tools
 
-Ferramentas Python para aquisição, armazenamento, inspeção, pré-processamento, treinamento, validação e inferência usando os dados CSI enviados pelo `STA_CSI_receiver`.
+Aplicação e ferramentas Python do sistema ESP32-S3 CSI Wi-Fi Sensing.
 
-## Requisitos
+A pasta concentra aquisição, armazenamento, pré-processamento, treinamento, validação e inferência contínua.
 
-O ambiente validado utiliza Python 3.11.
+## Uso normal
 
 Na raiz do repositório:
 
 ```powershell
-python -m venv .venv
-Set-ExecutionPolicy -Scope Process Bypass
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+.\run_app.bat
 ```
 
-Somente para a interface de aquisição:
+O programa abre em tela cheia. Não é necessário executar cada script manualmente.
 
-```powershell
-python -m pip install -r Tools/acquisition/gui/requirements.txt
-```
-
-## Fluxo de aquisição atual
+Menu disponível:
 
 ```text
-AP: UDP unicast a 50 Hz e HT20
-    ↓
-STA: callback CSI + fila FreeRTOS
-    ↓
-CSI2 binário a 921600 baud
+Aquisição do Dataset
+Detecção Realtime
+Treinar Modelo
+Resultados e Gravações
+Verificar instalação
+Encerrar
+```
+
+A tecla `Esc` retorna de uma tela auxiliar ao menu principal.
+
+## Estrutura
+
+```text
+Tools/
+├── app/
+│   └── gui_menu.py
+├── acquisition/
+│   ├── gui/
+│   │   ├── csi_viewer.py
+│   │   ├── csi_parser.py
+│   │   └── requirements.txt
+│   └── ferramentas auxiliares
+├── csi/
+│   └── csi_binary_io.py
+├── preprocessing/
+│   └── filtros, janelas e features
+├── training/
+│   ├── 20_retrain_dataset_v2.py
+│   └── dataset_v2_training_config.json
+├── realtime/
+│   ├── 01_realtime_inference.py
+│   ├── 02_tune_state_machine.py
+│   ├── 03_realtime_gui.py
+│   ├── realtime_inference_engine.py
+│   ├── temporal_state_machine.py
+│   └── state_machine_config_candidate_v4.json
+└── datasets/
+    ├── processed/
+    ├── results/
+    └── realtime_runs/
+```
+
+## Ambiente Python
+
+O ambiente validado utiliza Python 3.11.
+
+```powershell
+py -3.11 -m venv .venv
+
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+O arquivo `Tools/acquisition/gui/requirements.txt` contém apenas as dependências mínimas da interface de aquisição.
+
+## Menu principal
+
+`Tools/app/gui_menu.py` é o ponto de entrada da aplicação.
+
+Ele:
+
+- verifica a existência do modelo e das configurações;
+- abre a aquisição em tela cheia;
+- abre a detecção realtime em tela cheia;
+- executa o treinamento em processo separado;
+- permite abrir pastas de resultados;
+- verifica bibliotecas e portas seriais;
+- mantém apenas uma tela auxiliar ativa por vez.
+
+## Aquisição do Dataset
+
+A tela de aquisição usa:
+
+```text
+SerialReader
     ↓
 CSIFrameParser
     ↓
-CSIViewer
+eventos sample e stats
+    ↓
+visualização
     ↓
 CSIBIN1 versão 2
 ```
 
-A implementação textual antiga foi substituída no fluxo oficial pelo protocolo binário. Os scripts de CLI antigos permanecem úteis para histórico e depuração, mas a GUI é a ferramenta principal para novas coletas.
+Configuração atual:
 
-## Interface gráfica
-
-Execute a partir da raiz do repositório:
-
-```powershell
-python Tools/acquisition/gui/csi_viewer.py
-```
-
-Configurações principais:
-
-| Campo | Valor ou função |
+| Campo | Valor |
 |---|---|
-| Porta | porta serial do STA, normalmente COM4 no ambiente de desenvolvimento |
 | Baud | `921600` |
-| Classe | `empty`, `static_presence` ou `movement` |
-| Offset | atraso antes do início da janela de coleta |
-| Duração | 5 s por padrão |
-| Output folder | pasta-base escolhida para a sessão/quadrante |
+| Classes | `empty`, `static_presence`, `movement` |
+| Duração padrão | 5 s |
+| Offset | atraso antes de iniciar |
+| Organização | sessão, quadrante e classe |
 
-O arquivo é salvo em:
+Diagnósticos apresentados:
 
-```text
-<output folder>/raw_bin/<classe>_AAAAMMDD_HHMMSS.bin
-```
+- taxa de pacotes;
+- falhas de sequência;
+- erros CRC;
+- descartes no computador;
+- descartes no ESP32;
+- itens pendentes na fila do ESP32.
 
-Exemplo de organização do Dataset v2:
+Uma coleta deve ser aceita somente quando a taxa estiver próxima de 50 Hz e os contadores de erro e descarte estiverem em zero.
+
+## Formato CSIBIN1
+
+`Tools/csi/csi_binary_io.py` mantém o formato binário do dataset.
+
+A versão 2 preserva:
+
+- rótulo;
+- timestamp do computador;
+- timestamp alinhado à captura;
+- timestamp do ESP32;
+- sequência;
+- índice do pacote;
+- RSSI;
+- rate;
+- canal;
+- tamanho;
+- flags;
+- vetores imaginário e real.
+
+A leitura da versão 1 continua disponível para compatibilidade.
+
+## Dataset v2
+
+A organização recomendada é:
 
 ```text
 Tools/datasets/raw_v2/
-└── session_01/
-    ├── quad1/raw_bin/
-    ├── quad2/raw_bin/
-    ├── quad3/raw_bin/
-    ├── quad4/raw_bin/
-    └── quad5/raw_bin/
+└── session_XX/
+    ├── quad1/
+    │   └── raw_bin/
+    ├── quad2/
+    ├── quad3/
+    ├── quad4/
+    └── quad5/
 ```
 
-A classe já é armazenada dentro de cada pacote e também aparece no nome do arquivo. A sessão e o quadrante são representados atualmente pela estrutura de pastas.
+As três classes devem ser coletadas em aquisições independentes. O arquivo de origem é mantido como grupo durante a divisão de treino e teste.
 
-## Diagnósticos da GUI
-
-A barra de status apresenta:
-
-| Indicador | Significado |
-|---|---|
-| `Rate` | amostras recebidas no último segundo |
-| `Seq gaps` | amostras ausentes detectadas pelo campo de sequência |
-| `CRC` | frames com CRC inválido |
-| `PC drops` | eventos descartados porque a fila do computador encheu |
-| `ESP drops` | amostras descartadas porque a fila FreeRTOS encheu |
-| `ESP pending` | amostras aguardando serialização no STA |
-
-Uma coleta oficial deve ser aceita somente quando os contadores de erro e descarte estiverem em zero e a taxa estiver próxima de 50 Hz.
-
-## Protocolo serial
-
-O parser em `acquisition/gui/csi_parser.py` processa frames com:
+## Pré-processamento
 
 ```text
-Magic: CSI2
-Versão: 1
-Tipos: sample e stats
-Ordem de bytes: little-endian
-Integridade: CRC-16/CCITT-FALSE
-```
-
-A amostra contém sequência, timestamp do ESP32, RSSI, rate, canal, flags, tamanho e CSI bruto. O parser separa automaticamente o vetor intercalado em arrays `imag` e `real`.
-
-Na configuração atual HT20:
-
-```text
-csi_len = 256 inteiros int8
-imag = 128 valores
-real = 128 valores
-```
-
-## Formato de dataset binário
-
-O módulo `csi/csi_binary_io.py` usa:
-
-```text
-Magic do arquivo: CSIBIN1
-Versão atual de escrita: 2
-Versões aceitas na leitura: 1 e 2
-```
-
-Cada pacote da versão 2 preserva:
-
-- `label`;
-- `pc_timestamp`;
-- `capture_timestamp`, alinhado ao relógio do ESP32;
-- `esp_timestamp_us`;
-- `sequence`;
-- `packet_index`;
-- `rssi`;
-- `rate`;
-- `channel`;
-- `csi_len`;
-- `flags`;
-- vetores `imag` e `real` em `int16`.
-
-A leitura de arquivos versão 1 continua suportada, mas os campos que não existiam nessa versão recebem valores de compatibilidade.
-
-## Conversão para CSV
-
-O binário é o formato bruto oficial. CSV deve ser usado apenas para inspeção:
-
-```powershell
-python Tools/csi/bin_to_csv.py arquivo.bin arquivo.csv
-```
-
-## Organização das ferramentas
-
-### `acquisition/`
-
-- `gui/csi_parser.py`: parser incremental CSI2 e diagnósticos;
-- `gui/csi_viewer.py`: visualização e coleta binária;
-- `check_dataset.py`: verificações de integridade do dataset;
-- `analysis_dataset.py`: análises gerais das coletas;
-- `cli/`: loggers anteriores e ferramentas de depuração.
-
-### `csi/`
-
-- `csi_binary_io.py`: leitura e escrita CSIBIN1 v1/v2;
-- `csi_packet.py`: representação interna de pacote;
-- `bin_to_csv.py`: conversão auxiliar.
-
-### `preprocessing/`
-
-Fluxo numerado atual:
-
-```text
-00_diagnose_dataset_packets.py
-01_process_dataset.py
-02_extract_features.py
-03_subcarrier_variance_diagnostics.py
-04_correlation_threshold_diagnostics.py
-```
-
-Módulos auxiliares implementam:
-
-- amplitude a partir de I/Q;
-- limpeza e filtragem de Hampel;
-- média móvel;
-- normalização z-score;
-- correlação entre subportadoras;
-- janelas deslizantes;
-- extração e seleção de features.
-
-Os parâmetros ficam centralizados em:
-
-```text
-Tools/preprocessing/pipeline_parameters.json
-```
-
-### `training/`
-
-Os scripts numerados realizam, entre outras tarefas:
-
-- Fisher Score e seleção Top-K;
-- treinamento da árvore de decisão;
-- análise das features selecionadas;
-- holdout estratificado e holdout por arquivo;
-- tuning de profundidade, divisão mínima e Top-K;
-- diagnóstico binário;
-- validação hierárquica;
-- análise específica de `static_presence` versus `movement`.
-
-A separação por arquivo deve ser preferida para evitar que janelas do mesmo arquivo apareçam simultaneamente em treino e teste.
-
-Na branch `research/literature-guided-pipeline-review`, os experimentos adicionais com Regressão Logística, Gradient Boosting e XGBoost usam `scikit-learn` e `xgboost`. O candidato provisório selecionado antes da nova coleta é Gradient Boosting com Top-K 126, 20 estimadores, profundidade 3 e `learning_rate=0.1`; ele não deve ser tratado como modelo final até a repetição dos testes com o Dataset v2.
-
-### `classification/`
-
-`decision_tree.py` contém uma árvore de decisão própria, sem dependência obrigatória de `scikit-learn` na inferência. Essa escolha facilita a inspeção da estrutura e a futura tradução do modelo para execução embarcada.
-
-### `real_time/`
-
-`01_realtime_inference.py` concentra o fluxo de inferência em tempo real. Os parâmetros de normalização, subportadoras selecionadas, features e modelo devem ser os mesmos utilizados no treinamento.
-
-## Pipeline conceitual
-
-```text
-raw_bin
+pacotes binários
     ↓
-leitura dos pacotes
+matriz de amplitude
     ↓
-amplitude
-    ↓
-limpeza
+remoção de colunas não informativas
     ↓
 Hampel
     ↓
@@ -237,25 +177,167 @@ média móvel
     ↓
 z-score
     ↓
-remoção de redundância
+correlação
     ↓
-janelas deslizantes
+janelas
     ↓
-features
+11 descritores por subportadora
     ↓
-Fisher Score / Top-K
-    ↓
-classificador
-    ↓
-validação por arquivo e por quadrante
+Fisher / Top-K
 ```
 
-## Observações
+Os parâmetros estatísticos são ajustados somente no conjunto de treinamento e exportados para a inferência.
 
-- preserve sempre os arquivos binários brutos;
-- não misture automaticamente arquivos v1 e v2 em um mesmo experimento;
-- coletas antigas tinham frequência efetiva diferente e exigem reavaliação do tamanho da janela;
-- a janela deve ser definida em segundos e convertida para pacotes conforme a taxa real;
-- arquivos em `datasets/processed` são regeneráveis;
-- resultados finais em `datasets/results` fazem parte do histórico experimental do TCC;
-- não versione `.venv`, `build`, `__pycache__`, `.pyc` ou coletas temporárias.
+## Treinamento consolidado
+
+O menu executa:
+
+```powershell
+.\.venv\Scripts\python.exe -m Tools.training.20_retrain_dataset_v2
+```
+
+Configuração:
+
+```text
+Tools/training/dataset_v2_training_config.json
+```
+
+O pipeline:
+
+- valida os arquivos;
+- identifica sessão, quadrante e classe;
+- separa treino e teste por arquivo;
+- compara janelas, correlação, orçamento de features e classificadores;
+- treina o candidato final;
+- exporta tabelas, figuras, relatório e artefatos realtime.
+
+Candidato atual:
+
+```text
+Extra Trees
+100 árvores
+correlação 0,95
+janela 2,0 s
+passo 0,5 s
+160 features
+97 subportadoras
+```
+
+## Detecção realtime
+
+A tela realtime usa:
+
+```text
+CSI2 serial
+    ↓
+buffer incremental
+    ↓
+mesmo pré-processamento do treinamento
+    ↓
+Extra Trees
+    ↓
+probabilidades
+    ↓
+máquina de estados temporal
+    ↓
+estado final e TTS
+```
+
+Artefatos:
+
+```text
+Tools/datasets/processed/realtime_model_extra_trees.joblib
+Tools/datasets/processed/realtime_pipeline_config_extra_trees.json
+Tools/realtime/state_machine_config_candidate_v4.json
+```
+
+O motor espera:
+
+```text
+128 subportadoras de entrada
+100 pacotes por janela
+25 pacotes por passo
+112 pacotes no buffer inicial
+160 features selecionadas
+```
+
+## Calibração inicial
+
+Antes do monitoramento:
+
+1. a GUI apresenta uma contagem regressiva;
+2. o usuário deixa o ambiente vazio;
+3. a serial é aberta;
+4. o buffer é preenchido;
+5. janelas iniciais são avaliadas;
+6. a calibração é aprovada ou rejeitada;
+7. o motor é reiniciado para o monitoramento operacional.
+
+As previsões da calibração não são usadas como decisões operacionais.
+
+## Máquina de estados
+
+A configuração v4 selecionada usa:
+
+```text
+sem suavização adicional
+1 confirmação para transições normais
+1 confirmação para transições diretas
+limiar normal 0,0
+limiar direto 0,6
+estado inicial empty
+```
+
+O TTS anuncia apenas alterações aceitas no estado final.
+
+## Saídas realtime
+
+```text
+Tools/datasets/realtime_runs/run_AAAAMMDD_HHMMSS/
+├── calibration.json
+├── metadata.json
+├── raw_stream.bin
+└── realtime_predictions.csv
+```
+
+O rótulo real pode ser informado manualmente durante uma execução para permitir avaliação posterior, mas não influencia a classificação.
+
+## Comandos de desenvolvimento
+
+Verificar sintaxe:
+
+```powershell
+.\.venv\Scripts\python.exe -m py_compile `
+    Tools/app/gui_menu.py `
+    Tools/acquisition/gui/csi_viewer.py `
+    Tools/realtime/03_realtime_gui.py `
+    Tools/realtime/realtime_inference_engine.py
+```
+
+Abrir somente a aquisição:
+
+```powershell
+.\.venv\Scripts\python.exe Tools/acquisition/gui/csi_viewer.py
+```
+
+Abrir somente o realtime:
+
+```powershell
+.\.venv\Scripts\python.exe -m Tools.realtime.03_realtime_gui
+```
+
+Esses comandos são destinados a desenvolvimento e diagnóstico. No uso normal, execute apenas `run_app.bat`.
+
+## Arquivos locais
+
+Não devem ser versionados:
+
+- `.venv`;
+- `__pycache__`;
+- modelos temporários;
+- coletas de teste;
+- execuções realtime;
+- resultados intermediários;
+- arquivos `.pyc`.
+
+Os arquivos finais de relatório, tabelas e figuras podem ser preservados em `Tools/datasets/results`.

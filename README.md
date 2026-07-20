@@ -1,92 +1,216 @@
 # ESP32-S3 CSI Wi-Fi Sensing
 
-Projeto de TCC para aquisição e classificação de estados do ambiente por meio de CSI (*Channel State Information*) usando dois ESP32-S3 em uma arquitetura AP/STA.
+Sistema experimental de detecção passiva de presença humana usando informações CSI (*Channel State Information*) obtidas por dois ESP32-S3.
 
-O sistema atual trabalha com três classes:
+O projeto classifica o estado do ambiente em três classes:
 
-- `empty`;
-- `static_presence`;
-- `movement`.
+- `empty`: ambiente vazio;
+- `static_presence`: presença humana sem movimento significativo;
+- `movement`: presença humana em movimento.
 
-A aquisição é executada a aproximadamente **50 pacotes por segundo**, com canal Wi-Fi fixo, largura de banda **HT20** e transporte serial binário a **921600 baud**.
+A versão atual reúne aquisição binária, organização do Dataset v2, pré-processamento, treinamento, validação por arquivo, inferência contínua, máquina de estados temporal e aplicação gráfica em tela cheia.
 
-## Arquitetura
+## Visão geral
 
 ```text
-AP_controller
+ESP32-S3 AP
     │
-    │ UDP unicast a cada 20 ms
+    │ tráfego UDP controlado em HT20
     ▼
-STA_CSI_receiver
+ESP32-S3 receptor
     │
     │ CSI2 binário pela UART a 921600 baud
     ▼
-Tools/acquisition/gui/csi_viewer.py
+Aplicação Python
     │
-    │ arquivos CSIBIN1 versão 2
-    ▼
-Tools/datasets
-    │
-    ├── pré-processamento
-    ├── extração e seleção de features
-    ├── treinamento e validação
-    └── inferência em tempo real
+    ├── aquisição do dataset
+    ├── treinamento e avaliação
+    └── detecção realtime
 ```
 
-## Estado atual
+O conteúdo dos pacotes UDP não é utilizado diretamente na classificação. O tráfego mantém um fluxo controlado de recepções para que o ESP32-S3 receptor disponibilize amostras CSI.
 
-A cadeia de aquisição foi validada com:
+## Estado consolidado
 
-- AP enviando tráfego UDP periódico próximo de 50 Hz;
-- Wi-Fi fixado em 20 MHz;
-- CSI com `csi_len=256`, equivalente a 128 pares complexo I/Q na configuração atual;
-- callback CSI leve, com cópia imediata para uma fila FreeRTOS;
-- filtragem dos quadros pelo BSSID do AP e pelo MAC do STA;
-- transporte serial binário com CRC-16/CCITT-FALSE;
-- diagnóstico de falhas de sequência e descartes no ESP32 e no computador;
-- arquivos de dataset binários na versão 2, mantendo leitura retrocompatível da versão 1.
+A configuração experimental atual utiliza:
 
-Em uma aquisição saudável de 5 segundos, o esperado é aproximadamente:
+| Parâmetro | Valor |
+|---|---:|
+| Dispositivos | 2 ESP32-S3 |
+| Largura de banda | HT20 |
+| Taxa esperada | aproximadamente 50 pacotes/s |
+| Baud rate | 921600 |
+| `csi_len` esperado | 256 inteiros |
+| Subportadoras complexas | 128 |
+| Classes | 3 |
+| Janela | 2,0 s |
+| Passo | 0,5 s |
+| Classificador selecionado | Extra Trees |
+| Árvores | 100 |
+| Subportadoras utilizadas | 97 |
+| Features selecionadas | 160 |
 
-```text
-240 a 260 pacotes
-48 a 52 Hz
-Sequence gaps: 0
-CRC errors: 0
-PC drops: 0
-ESP drops: 0
-csi_len: 256
-bandwidth: 20 MHz
-```
-
-O valor de MCS pode variar durante a aquisição sem alterar o tamanho do vetor CSI.
+Na avaliação consolidada do Dataset v2, o candidato selecionado obteve macro F1 médio de aproximadamente `0,8402`. Na simulação de cenário contínuo utilizada durante o desenvolvimento, a classificação bruta atingiu acurácia de aproximadamente `0,8914`. A configuração temporal v4 elevou esse resultado para aproximadamente `0,9140` no mesmo cenário de desenvolvimento. Esse último valor não substitui uma validação independente em ambiente distinto.
 
 ## Estrutura principal
 
 ```text
 ESP32-S3_CSI_Wifi_Sensing/
-├── AP_controller/          # AP, largura HT20 e tráfego UDP controlado
-├── STA_CSI_receiver/       # recepção UDP, captura CSI e protocolo CSI2
+├── AP_controller/
+│   └── firmware que cria a rede e gera o tráfego UDP
+├── STA_CSI_receiver/
+│   └── firmware que recebe os pacotes, captura CSI e envia frames CSI2
 ├── Tools/
-│   ├── acquisition/        # GUI, parser serial e diagnósticos de dataset
-│   ├── csi/                # leitura, escrita e conversão dos arquivos binários
-│   ├── preprocessing/      # limpeza, filtros, janelas e features
-│   ├── training/           # seleção, treinamento e validação
-│   ├── classification/     # árvore de decisão implementada no projeto
-│   ├── real_time/          # inferência em fluxo contínuo
-│   └── datasets/           # dados, artefatos intermediários e resultados
-├── requirements.txt        # dependências diretas do ambiente Python
-└── requirements-lock.txt   # versões exatas do ambiente validado
+│   ├── app/
+│   │   └── menu principal da aplicação
+│   ├── acquisition/
+│   │   └── interface de aquisição, parser e diagnósticos
+│   ├── csi/
+│   │   └── leitura e escrita do formato CSIBIN1
+│   ├── preprocessing/
+│   │   └── preparação dos sinais e extração de características
+│   ├── training/
+│   │   └── treinamento, comparações e validações
+│   ├── realtime/
+│   │   └── inferência contínua e máquina de estados
+│   └── datasets/
+│       └── dados locais, artefatos e resultados
+├── requirements.txt
+├── requirements-lock.txt
+├── run_app.bat
+└── run_app.vbs
+```
+
+## Requisitos
+
+- Windows 10 ou 11;
+- Python 3.11;
+- ESP-IDF compatível com ESP32-S3;
+- duas placas ESP32-S3;
+- cabos USB para gravação e comunicação serial.
+
+O ambiente de firmware foi validado com ESP-IDF 6.0. As portas `COM3` e `COM4` apresentadas nos exemplos devem ser ajustadas conforme o computador utilizado.
+
+## Instalação do ambiente Python
+
+Na raiz do repositório:
+
+```powershell
+py -3.11 -m venv .venv
+
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+Para reproduzir as versões exatas registradas no ambiente validado:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-lock.txt
+```
+
+## Execução do programa
+
+O uso normal exige apenas:
+
+```powershell
+.\run_app.bat
+```
+
+Também é possível abrir `run_app.bat` por duplo clique.
+
+O arquivo `run_app.vbs` inicia o mesmo programa sem manter a janela do terminal visível e pode ser usado como destino de um atalho do Windows.
+
+A aplicação abre em tela cheia e apresenta:
+
+- **Aquisição do Dataset**;
+- **Detecção Realtime**;
+- **Treinar Modelo**;
+- **Resultados e Gravações**;
+- **Verificar instalação**;
+- **Encerrar**.
+
+As interfaces auxiliares também são exibidas em tela cheia. A tecla `Esc` ou o botão **Voltar ao menu** retorna à tela inicial.
+
+## Artefatos necessários para o realtime
+
+A detecção contínua utiliza:
+
+```text
+Tools/datasets/processed/realtime_model_extra_trees.joblib
+Tools/datasets/processed/realtime_pipeline_config_extra_trees.json
+Tools/realtime/state_machine_config_candidate_v4.json
+```
+
+O arquivo `.joblib` é um artefato binário gerado localmente pelo treinamento e pode não estar incluído no repositório. A opção **Verificar instalação** informa quando algum desses arquivos está ausente.
+
+## Calibração inicial
+
+Ao iniciar a detecção realtime, a aplicação executa:
+
+```text
+contagem regressiva
+    ↓
+abertura da porta serial
+    ↓
+preenchimento do buffer
+    ↓
+calibração com o ambiente vazio
+    ↓
+reinicialização do buffer operacional
+    ↓
+monitoramento contínuo
+```
+
+Durante a calibração, o usuário deve deixar o ambiente vazio. A aplicação avalia a proporção de janelas classificadas como `empty`, a probabilidade média dessa classe e a taxa de pacotes.
+
+Quando a calibração não é aprovada, são oferecidas as opções:
+
+- repetir a calibração;
+- iniciar mesmo assim;
+- cancelar.
+
+O resultado é salvo em `calibration.json` dentro da pasta da execução.
+
+## Fluxo de aquisição
+
+A interface de aquisição permite:
+
+- selecionar a porta serial;
+- acompanhar CSI, RSSI e diagnósticos;
+- escolher sessão, quadrante e classe;
+- executar coletas manuais;
+- executar uma sequência programada com avisos sonoros;
+- salvar os pacotes no formato binário CSIBIN1.
+
+Classes aceitas:
+
+```text
+empty
+static_presence
+movement
+```
+
+Uma aquisição saudável de 5 segundos deve apresentar, aproximadamente:
+
+```text
+240 a 260 pacotes
+48 a 52 Hz
+Sequence gaps: 0
+CRC: 0
+PC drops: 0
+ESP drops: 0
+csi_len: 256
 ```
 
 ## Pipeline de processamento
 
 ```text
-CSI bruto I/Q
+CSI complexo I/Q
     ↓
 amplitude
     ↓
-limpeza de subportadoras
+remoção de posições não informativas
     ↓
 filtro de Hampel
     ↓
@@ -98,114 +222,87 @@ remoção de redundância por correlação
     ↓
 janelas deslizantes
     ↓
-extração de features estatísticas
+extração de características
     ↓
-Fisher Score / Top-K
+seleção Fisher / Top-K
     ↓
-classificação e validação por arquivo
+classificador
+    ↓
+máquina de estados temporal
 ```
 
-O pipeline principal mantém uma implementação própria de árvore de decisão para facilitar a futura exportação do modelo. Na branch `research/literature-guided-pipeline-review`, os experimentos comparativos usam também `scikit-learn` e `xgboost`; o candidato provisório mais recente é um Gradient Boosting compacto com Top-K 126, 20 estimadores, profundidade 3 e taxa de aprendizado 0,1. Essa escolha deve ser revalidada após a coleta do Dataset v2.
+Médias, desvios, subportadoras e features são ajustados usando apenas os arquivos de treinamento e depois exportados para o realtime. A aplicação ao vivo não recalcula esses parâmetros.
 
-## Requisitos
+## Treinamento
 
-- 2 placas ESP32-S3;
-- ESP-IDF 6.0;
-- Python 3.11;
-- cabos USB para gravação e comunicação serial;
-- Windows PowerShell ou outro terminal compatível com ESP-IDF e Python.
+O menu **Treinar Modelo** executa o pipeline consolidado do Dataset v2 em processo separado.
 
-### Ambiente Python
-
-Na raiz do repositório:
+O comando equivalente é:
 
 ```powershell
-python -m venv .venv
-Set-ExecutionPolicy -Scope Process Bypass
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m Tools.training.20_retrain_dataset_v2
 ```
 
-Para reproduzir exatamente o ambiente validado:
+A configuração principal está em:
 
-```powershell
-python -m pip install -r requirements-lock.txt
+```text
+Tools/training/dataset_v2_training_config.json
 ```
 
-O arquivo `Tools/acquisition/gui/requirements.txt` contém apenas as dependências mínimas da interface de aquisição.
+O protocolo mantém todas as janelas de um mesmo arquivo no mesmo conjunto, evitando que uma aquisição apareça simultaneamente no treino e no teste.
 
-## Preparação do ESP-IDF no Windows
-
-Em um novo PowerShell:
-
-```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-. "C:\esp\v6.0\esp-idf\export.ps1"
-```
-
-## Compilação e gravação
+## Compilação dos firmwares
 
 ### AP
 
 ```powershell
 cd AP_controller
+idf.py set-target esp32s3
 idf.py build
 idf.py -p COM3 flash
-idf.py -p COM3 monitor
 ```
 
-O AP deve mostrar uma taxa próxima de 50 pacotes por segundo e zero erros de envio.
-
-### STA
+### Receptor
 
 ```powershell
 cd STA_CSI_receiver
+idf.py set-target esp32s3
 idf.py build
 idf.py -p COM4 flash
 ```
 
-Após o início do fluxo CSI binário, a COM do STA deve ser aberta pela GUI a 921600 baud. Não mantenha o `idf.py monitor` conectado à mesma porta durante a aquisição.
+O AP deve ser iniciado antes do receptor. Feche `idf.py monitor` na porta do receptor antes de abrir a aplicação, pois a UART passa a transportar frames binários CSI2.
 
-## Executar a interface de aquisição
+## Arquivos gerados
 
-Na raiz do repositório, com o ambiente virtual ativo:
-
-```powershell
-python Tools/acquisition/gui/csi_viewer.py
-```
-
-Configuração padrão atual:
+As execuções realtime são armazenadas em:
 
 ```text
-Baud: 921600
-Duração: 5 s
-Classes: empty, static_presence, movement
-Formato salvo: <pasta selecionada>/raw_bin/<classe>_AAAAMMDD_HHMMSS.bin
+Tools/datasets/realtime_runs/run_AAAAMMDD_HHMMSS/
+├── calibration.json
+├── metadata.json
+├── raw_stream.bin
+└── realtime_predictions.csv
 ```
 
-Para organizar uma nova base sem misturá-la ao dataset antigo, selecione pastas separadas por sessão e quadrante, por exemplo:
+Os resultados do treinamento ficam em:
 
 ```text
-Tools/datasets/raw_v2/session_01/quad1/
-Tools/datasets/raw_v2/session_01/quad2/
-...
+Tools/datasets/results/
 ```
 
-A GUI acrescentará automaticamente a subpasta `raw_bin`.
+## Documentação dos módulos
 
-## Documentação específica
-
-- [`AP_controller/README.md`](AP_controller/README.md): configuração do AP e geração do tráfego UDP;
-- [`STA_CSI_receiver/README.md`](STA_CSI_receiver/README.md): captura, filtro e protocolo binário CSI2;
-- [`Tools/README.md`](Tools/README.md): aquisição no computador, formato do dataset e pipeline Python.
+- [`AP_controller/README.md`](AP_controller/README.md)
+- [`STA_CSI_receiver/README.md`](STA_CSI_receiver/README.md)
+- [`Tools/README.md`](Tools/README.md)
 
 ## Cuidados experimentais
 
-- inicialize o AP antes do STA;
-- mantenha posição, canal e largura de banda dos dispositivos constantes;
-- não misture diretamente o Dataset v2 com coletas antigas de densidade diferente;
-- registre sessões independentes para reduzir dependência temporal;
-- confira os diagnósticos da GUI antes de aceitar uma coleta;
-- preserve os arquivos binários brutos e gere CSV apenas para inspeção;
-- reavalie o tamanho das janelas quando a frequência de aquisição for alterada.
+- mantenha AP e receptor em posições fixas;
+- preserve canal, largura de banda e orientação dos dispositivos;
+- não use simultaneamente `idf.py monitor` e a aplicação na mesma porta;
+- confira taxa, CRC, falhas de sequência e descartes antes de aceitar uma coleta;
+- preserve os arquivos binários brutos;
+- mantenha arquivos de uma mesma aquisição no mesmo conjunto durante a validação;
+- trate resultados da máquina temporal obtidos no cenário de desenvolvimento como ajuste, não como validação independente.

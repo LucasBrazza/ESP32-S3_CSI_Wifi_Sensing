@@ -1,73 +1,66 @@
 # AP_controller
 
-Firmware do ESP32-S3 responsável por criar a rede Wi-Fi experimental e gerar tráfego UDP unicast controlado para o `STA_CSI_receiver`.
+Firmware do ESP32-S3 responsável por criar a rede Wi-Fi experimental e gerar o tráfego usado na obtenção das amostras CSI.
 
-O AP não coleta CSI. Sua função é manter as condições de transmissão reproduzíveis para que o STA capture uma amostra CSI por pacote recebido.
+O AP não realiza classificação nem captura CSI. Sua função é manter uma comunicação controlada com o receptor.
 
-## Configuração atual
-
-| Parâmetro | Valor atual | Origem |
-|---|---:|---|
-| Modo Wi-Fi | Access Point | `main.c` |
-| Largura de banda | 20 MHz (`WIFI_BW20`) | `main.c` |
-| Intervalo UDP | 20 ms | `UDP_INTERVAL_MS` |
-| Taxa solicitada | 50 pacotes/s | derivada do intervalo |
-| IP de destino | `192.168.4.2` | `UDP_TARGET_IP` |
-| Porta UDP | `3333` | `UDP_TARGET_PORT` |
-| Canal padrão | 6 | `Kconfig.projbuild` |
-| Máximo de clientes | 1 | `Kconfig.projbuild` |
-
-SSID, senha, canal e número máximo de clientes são configuráveis por `idf.py menuconfig` no menu **Wi-Fi CSI Project Configuration**.
-
-## Funcionamento
+## Fluxo
 
 ```text
-Inicialização do NVS
-    ↓
-Wi-Fi em modo AP
-    ↓
-SSID, senha e canal configurados
-    ↓
-interface iniciada e fixada em HT20
-    ↓
-tarefa UDP periódica
-    ↓
-pacote enviado ao STA a cada 20 ms
+AP_controller
+    │
+    │ UDP unicast periódico
+    ▼
+STA_CSI_receiver
+    │
+    │ captura CSI dos quadros recebidos
+    ▼
+Computador
 ```
 
-A tarefa usa `xTaskDelayUntil()` para manter o período referenciado ao instante anterior. Assim, o tempo gasto na montagem e no envio do pacote não é somado continuamente ao intervalo de 20 ms.
+## Responsabilidades
 
-O payload contém uma sequência e o timestamp interno do AP:
+- configurar o ESP32-S3 no modo Access Point;
+- criar a rede com SSID e senha conhecidos;
+- manter o canal e a largura de banda definidos;
+- aguardar a conexão do receptor;
+- enviar pacotes UDP ao STA;
+- registrar estatísticas de envio.
+
+O conteúdo UDP não participa diretamente da classificação. Ele apenas cria eventos regulares de recepção no STA.
+
+## Configuração experimental
+
+| Parâmetro | Valor atual |
+|---|---:|
+| Alvo | ESP32-S3 |
+| Modo Wi-Fi | Access Point |
+| Largura de banda | HT20 |
+| Intervalo UDP | aproximadamente 20 ms |
+| Taxa esperada | aproximadamente 50 pacotes/s |
+| Destino | endereço IP do STA |
+| Transporte | UDP unicast |
+
+SSID, senha, canal, IP e porta devem coincidir com a configuração do receptor.
+
+## Componentes
+
+A implementação é dividida em arquivos com responsabilidades específicas:
 
 ```text
-CSI_PKT,<sequence>,<timestamp_us>
+main/
+├── main.c
+├── wifi_manager.c
+├── wifi_manager.h
+├── udp_sender.c
+└── udp_sender.h
 ```
 
-Esses campos são úteis para diagnóstico do emissor, mas o dataset principal é formado pelos metadados e pelo CSI capturados no STA.
-
-## Por que o AP é fixado em 20 MHz?
-
-Durante os testes em HT40, os quadros recebidos alternavam entre 20 e 40 MHz, produzindo vetores CSI com tamanhos diferentes (`256` e `384`). O uso de `WIFI_BW20` estabiliza a forma do dado na configuração atual:
-
-```text
-csi_len = 256 inteiros int8
-          ↓
-128 pares imag/real
-          ↓
-128 valores complexos
-```
-
-## Arquivos principais
-
-| Arquivo | Responsabilidade |
-|---|---|
-| `main/main.c` | inicialização do AP, largura de banda e tarefa UDP |
-| `main/Kconfig.projbuild` | SSID, senha, canal e número máximo de clientes |
-| `sdkconfig` | configuração gerada pelo ESP-IDF |
+Os nomes podem variar conforme a revisão do firmware, mas o fluxo permanece dividido entre inicialização, configuração Wi-Fi e geração do tráfego.
 
 ## Compilar e gravar
 
-Carregue primeiro o ambiente ESP-IDF 6.0. Depois, dentro da pasta do projeto:
+Abra um terminal ESP-IDF e execute:
 
 ```powershell
 cd AP_controller
@@ -77,40 +70,38 @@ idf.py build
 idf.py -p COM3 flash
 ```
 
-A porta `COM3` é apenas o exemplo usado no ambiente de desenvolvimento; ajuste conforme o computador.
+A porta `COM3` é apenas um exemplo.
 
-## Monitorar
+Para diagnóstico:
 
 ```powershell
 idf.py -p COM3 monitor
 ```
 
-O firmware informa as estatísticas aproximadamente uma vez por segundo. O resultado esperado é semelhante a:
-
-```text
-UDP stats: rate=50.00 pkt/s, sent=50, errors=0
-```
-
-Pequenas oscilações ao redor de 50 pacotes/s são aceitáveis. Erros contínuos ou ausência de envios indicam que o STA ainda não recebeu o IP esperado ou que há problema na conexão.
-
-Para sair do monitor do ESP-IDF:
-
-```text
-Ctrl + ]
-```
-
 ## Ordem de inicialização
 
-1. ligue e valide o `AP_controller`;
-2. ligue ou reinicie o `STA_CSI_receiver`;
-3. aguarde o STA receber o IP `192.168.4.2`;
-4. abra a GUI de aquisição na porta serial do STA.
+1. ligue ou reinicie o AP;
+2. confirme que a rede foi criada;
+3. ligue o receptor;
+4. aguarde a conexão do STA;
+5. confirme o início do envio UDP;
+6. abra a aplicação no computador.
 
-## Critérios de validação
+## Resultado esperado
 
-- AP criado no canal configurado;
-- largura de banda informada como HT20;
-- STA conectado;
-- taxa UDP próxima de 50 pacotes/s;
-- `errors=0` nas estatísticas do AP;
-- no STA, apenas `bandwidth=20MHz` e `csi_len=256` na configuração atual.
+Com o receptor conectado, o AP deve apresentar:
+
+```text
+aproximadamente 50 pacotes enviados por segundo
+erros de envio próximos de zero
+destino UDP correspondente ao STA
+canal e largura de banda estáveis
+```
+
+## Cuidados
+
+- não altere o canal durante uma sessão;
+- mantenha a largura de banda em HT20 para reproduzir a configuração validada;
+- não altere a taxa UDP sem reavaliar a taxa CSI e o tamanho das janelas;
+- inicialize o AP antes do receptor;
+- mantenha posição e orientação do dispositivo durante as coletas.

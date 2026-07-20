@@ -1,10 +1,13 @@
-# Aquisição, visualização e processamento numérico
-matplotlib>=3.9,<4
+# Interface, aquisição e processamento numérico
 numpy>=2.0,<3
+scipy>=1.15,<2
+pandas>=2.2,<3
+matplotlib>=3.9,<4
 pyserial>=3.5,<4
 PyQt5>=5.15,<6
 pyqtgraph>=0.13,<1
 
-# Experimentos comparativos da branch de pesquisa e validação de classificadores
+# Treinamento, validação e serialização
+joblib>=1.5,<2
 scikit-learn>=1.5,<2
 xgboost>=3.0,<4
